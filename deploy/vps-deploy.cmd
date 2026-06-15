@@ -57,10 +57,14 @@ if errorlevel 1 exit /b 1
 call npm run build
 if errorlevel 1 exit /b 1
 
-echo === 4. Database migrations ===
+echo === 4. Database migrations (skip if DB not ready — run deploy\vps-fix-mysql-and-start.cmd later) ===
 cd /d "%APP%"
 node db\run-migrations.js
-node db\apply-v6.js
+if errorlevel 1 (
+  echo WARNING: migrations failed — fix MySQL then run deploy\vps-fix-mysql-and-start.cmd
+) else (
+  node db\apply-v6.js
+)
 
 echo === 5. PM2 — stop old report-portal, start new app ===
 pm2 delete helion-report-portal 2>nul
