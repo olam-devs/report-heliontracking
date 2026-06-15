@@ -1,0 +1,23 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: "Inter", system-ui, sans-serif;
+  background: #f0f4f8;
+  color: #1a2332;
+}
+
+@keyframes helion-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.helion-sync-spin {
+  display: inline-block;
+  animation: helion-spin 0.9s linear infinite;
+}
