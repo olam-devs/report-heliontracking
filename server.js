@@ -1,3 +1,4 @@
+console.log('[boot] fleet-incident-reporter starting...');
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -70,4 +71,7 @@ app.listen(PORT, () => {
     }
     startNotificationScanner();
   });
+}).on('error', (err) => {
+  console.error('[boot] listen failed:', err.message);
+  process.exit(1);
 });
