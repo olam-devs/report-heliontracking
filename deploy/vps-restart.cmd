@@ -1,23 +1,28 @@
 @echo off
-REM Start fleet reporter in PM2 (run from repo or anywhere)
-setlocal
+REM Free port 3002 and start helion-fleet-reporter
+setlocal EnableDelayedExpansion
 set LIVE=C:\helion\fleet-incident-reporter
 cd /d "%LIVE%"
-if not exist server.js (
-  echo ERROR: %LIVE%\server.js not found
-  exit /b 1
-)
 
-echo === Free port 3002 if stuck ===
+echo === What is using port 3002? ===
+netstat -ano | findstr ":3002" | findstr LISTENING
+echo.
+
 for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":3002" ^| findstr LISTENING') do (
-  echo Killing PID %%P on port 3002
+  echo Killing PID %%P ...
   taskkill /F /PID %%P 2>nul
 )
 
 pm2 delete helion-fleet-reporter 2>nul
+pm2 delete helion-report-portal 2>nul
+
+echo.
+echo === Start app ===
 pm2 start deploy\ecosystem.config.cjs --update-env
 pm2 save
-timeout /t 3 /nobreak >nul
+
+timeout /t 4 /nobreak >nul
+echo.
 pm2 status
 curl -s http://127.0.0.1:3002/api/health
 echo.
