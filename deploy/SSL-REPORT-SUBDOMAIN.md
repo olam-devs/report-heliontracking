@@ -45,9 +45,13 @@ Typical path (menus vary slightly by version):
 win-acme should write updated files to:
 
 ```
-C:\nginx\nginx-1.30.0\ssl\heliontracking.com-chain.pem
-C:\nginx\nginx-1.30.0\ssl\heliontracking.com-key.pem
+C:\nginx\nginx-1.30.0\ssl\report.heliontracking.com-chain.pem
+C:\nginx\nginx-1.30.0\ssl\report.heliontracking.com-key.pem
 ```
+
+(You already have a separate win-acme renewal #2 for `report.heliontracking.com`.)
+
+Nginx must use **those** files — not `heliontracking.com-chain.pem`.
 
 Then:
 
