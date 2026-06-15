@@ -109,9 +109,10 @@ function startNotificationScanner() {
       console.error('[notifications] scan failed:', e.message);
     });
   };
-  tick();
+  const delayMs = parseInt(process.env.NOTIFICATION_SCAN_START_DELAY_MS || '', 10) || 120000;
+  setTimeout(tick, delayMs);
   timer = setInterval(tick, SCAN_INTERVAL_MS);
-  console.log(`[notifications] background scanner every ${Math.round(SCAN_INTERVAL_MS / 60000)} min (≥${NOTIFICATION_MIN_LITRES}L theft only)`);
+  console.log(`[notifications] first scan in ${Math.round(delayMs / 1000)}s, then every ${Math.round(SCAN_INTERVAL_MS / 60000)} min`);
 }
 
 function stopNotificationScanner() {

@@ -10,7 +10,7 @@ module.exports = {
       exec_mode: 'fork',
       instances: 1,
       autorestart: true,
-      max_memory_restart: '2G',
+      max_memory_restart: '7G',
       node_args: '--max-old-space-size=8192',
       env: {
         NODE_ENV: 'production',

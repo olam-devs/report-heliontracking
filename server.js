@@ -58,14 +58,16 @@ if (isProd && fs.existsSync(path.join(clientDist, 'index.html'))) {
 
 app.listen(PORT, () => {
   console.log(`Fleet Incident Reporter  →  http://localhost:${PORT} (${isProd ? 'production' : 'development'})`);
-  dailyLog.refreshVehicleMetaFromDisk();
-  const purged = purgeAllUncalibratedNotifications((id) => dailyLog.getVehicleMeta(id));
-  if (purged > 0) console.log(`[notifications] removed ${purged} stored alert(s) for uncalibrated vehicles`);
-  try {
-    const dz = rebuildDangerZonesFromNotifications((id) => dailyLog.getVehicleMeta(id));
-    console.log(`[danger-zones] indexed ${dz} point(s) from notifications`);
-  } catch (e) {
-    console.error('[danger-zones] rebuild failed:', e.message);
-  }
-  startNotificationScanner();
+  setImmediate(() => {
+    try {
+      dailyLog.refreshVehicleMetaFromDisk();
+      const purged = purgeAllUncalibratedNotifications((id) => dailyLog.getVehicleMeta(id));
+      if (purged > 0) console.log(`[notifications] removed ${purged} stored alert(s) for uncalibrated vehicles`);
+      const dz = rebuildDangerZonesFromNotifications((id) => dailyLog.getVehicleMeta(id));
+      console.log(`[danger-zones] indexed ${dz} point(s) from notifications`);
+    } catch (e) {
+      console.error('[startup] tracking index failed:', e.message);
+    }
+    startNotificationScanner();
+  });
 });
