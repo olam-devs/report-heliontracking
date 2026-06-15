@@ -5,7 +5,7 @@ set APP=C:\helion\fleet-incident-reporter
 cd /d "%APP%"
 
 echo === Looking for MySQL service ===
-for %%S in (MySQL80 MySQL MySQL57 MariaDB) do (
+for %%S in (MySQL97 MySQL80 MySQL MySQL57 MariaDB) do (
   sc query %%S 2>nul | findstr /I "STATE" | findstr /I "RUNNING" >nul && (
     echo Service %%S is running
     goto migrate
