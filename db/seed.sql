@@ -2,9 +2,9 @@ USE fleet_incidents;
 
 -- Default users (all passwords: admin123)
 INSERT IGNORE INTO users (id, name, email, password, role) VALUES
-(1, 'System Admin',  'admin@heliontracking.com',   '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lHjO', 'admin'),
-(2, 'Fleet Manager', 'manager@heliontracking.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lHjO', 'manager'),
-(3, 'HR Officer',    'hr@heliontracking.com',      '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lHjO', 'hr');
+(1, 'System Admin',  'admin@heliontracking.com',   '$2a$10$1fF5NTOflxbUmDQE3plh1unUs1HRb.DrDGZHpYIwyu3R6PIpI6PsK', 'admin'),
+(2, 'Fleet Manager', 'manager@heliontracking.com', '$2a$10$1fF5NTOflxbUmDQE3plh1unUs1HRb.DrDGZHpYIwyu3R6PIpI6PsK', 'manager'),
+(3, 'HR Officer',    'hr@heliontracking.com',      '$2a$10$1fF5NTOflxbUmDQE3plh1unUs1HRb.DrDGZHpYIwyu3R6PIpI6PsK', 'hr');
 
 -- Built-in templates
 INSERT IGNORE INTO templates (id, name, language, sections, created_by) VALUES
