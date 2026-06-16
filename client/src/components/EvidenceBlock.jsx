@@ -2,15 +2,86 @@ import { useState, useRef } from 'react';
 import api, { downloadFile } from '../api/client';
 import toast from 'react-hot-toast';
 
-const FILE_ICONS = {
-  image: '🖼️', video: '🎬', document: '📄', audio: '🔊',
-};
+// ── Preview Modal ─────────────────────────────────────────────────────────────
 
-function FilePreview({ file, onDelete, onDescriptionSaved, readOnly, canDownload }) {
+function PreviewModal({ file, url, onClose }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col"
+        style={{ maxWidth: '90vw', maxHeight: '90vh', minWidth: 320 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 bg-gray-50 shrink-0">
+          <span className="text-sm font-medium text-gray-700 truncate max-w-xs">{file.file_name}</span>
+          <button
+            onClick={onClose}
+            className="ml-4 text-gray-400 hover:text-gray-700 transition-colors text-lg leading-none shrink-0"
+          >✕</button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-100" style={{ minHeight: 300 }}>
+          {file.file_type === 'image' && (
+            <img
+              src={url}
+              alt={file.file_name}
+              className="max-w-full max-h-[75vh] object-contain"
+            />
+          )}
+          {file.file_type === 'video' && (
+            <video controls autoPlay className="max-w-full max-h-[75vh] bg-black" style={{ maxWidth: '80vw' }}>
+              <source src={url} type={file.mime_type} />
+            </video>
+          )}
+          {file.file_type === 'document' && file.mime_type === 'application/pdf' && (
+            <iframe
+              src={`${url}#toolbar=1&view=FitH`}
+              title={file.file_name}
+              className="w-full border-0"
+              style={{ height: '75vh', minWidth: '60vw' }}
+            />
+          )}
+          {file.file_type === 'document' && file.mime_type !== 'application/pdf' && (
+            <div className="flex flex-col items-center justify-center gap-3 py-12 px-8 text-center">
+              <span className="text-5xl">📄</span>
+              <p className="text-sm font-medium text-gray-700">{file.file_name}</p>
+              <p className="text-xs text-gray-400">Word and Excel files cannot be previewed in the browser.</p>
+              <p className="text-xs text-gray-400">Download the file to view it.</p>
+            </div>
+          )}
+          {file.file_type === 'audio' && (
+            <div className="p-8">
+              <audio controls src={url} className="w-full min-w-[300px]" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── File Card ─────────────────────────────────────────────────────────────────
+
+const FILE_ICONS = { image: '🖼️', video: '🎬', document: '📄', audio: '🔊' };
+
+function FileCard({ file, onDelete, onDescriptionSaved, readOnly, canDownload }) {
   const [desc, setDesc] = useState(file.description || '');
   const [saving, setSaving] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+
   const url = `/uploads/steps/${file.step_id}/${file.file_path.split('/').pop()}`;
+
+  const canPreview =
+    file.file_type === 'image' ||
+    file.file_type === 'video' ||
+    file.file_type === 'audio' ||
+    (file.file_type === 'document' && file.mime_type === 'application/pdf');
 
   const saveDescription = async () => {
     if (desc === (file.description || '')) { setEditingDesc(false); return; }
@@ -27,101 +98,105 @@ function FilePreview({ file, onDelete, onDescriptionSaved, readOnly, canDownload
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
-      {/* Preview area */}
-      {file.file_type === 'image' && (
-        <img src={url} alt={file.file_name} className="w-full h-36 object-cover"
-          onError={(e) => { e.target.style.display = 'none'; }} />
-      )}
-      {file.file_type === 'video' && (
-        <video controls className="w-full h-36 object-cover bg-black">
-          <source src={url} type={file.mime_type} />
-        </video>
-      )}
-      {(file.file_type === 'document' || file.file_type === 'audio') && (
-        <div className="flex items-center gap-3 p-3 bg-gray-50 border-b border-gray-100">
-          <span className="text-3xl">{FILE_ICONS[file.file_type]}</span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium truncate">{file.file_name}</p>
-            <p className="text-xs text-gray-400">{(file.file_size / 1024).toFixed(1)} KB</p>
-          </div>
+    <>
+      {previewing && <PreviewModal file={file} url={url} onClose={() => setPreviewing(false)} />}
+
+      <div className="flex items-start gap-2.5 border border-gray-200 rounded-lg p-2.5 bg-white hover:bg-gray-50 transition-colors group">
+        {/* Thumbnail / Icon */}
+        <div
+          className={`shrink-0 w-12 h-12 rounded-md overflow-hidden border border-gray-100 flex items-center justify-center bg-gray-50 ${(canPreview) ? 'cursor-pointer' : ''}`}
+          onClick={() => canPreview && setPreviewing(true)}
+          title={canPreview ? 'Click to preview' : ''}
+        >
+          {file.file_type === 'image' ? (
+            <img src={url} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+          ) : (
+            <span className="text-xl">{FILE_ICONS[file.file_type] || '📎'}</span>
+          )}
         </div>
-      )}
 
-      {/* File name row */}
-      <div className="px-3 pt-2 pb-1">
-        <p className="text-xs text-gray-500 truncate">{file.file_name}</p>
-      </div>
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <p
+            className={`text-xs font-medium text-gray-800 truncate leading-snug ${canPreview ? 'cursor-pointer hover:text-brand-600' : ''}`}
+            onClick={() => canPreview && setPreviewing(true)}
+            title={file.file_name}
+          >
+            {file.file_name}
+          </p>
+          <p className="text-[10px] text-gray-400 mb-1">{(file.file_size / 1024).toFixed(1)} KB</p>
 
-      {/* Description */}
-      <div className="px-3 pb-2">
-        {readOnly ? (
-          desc
-            ? <p className="text-xs text-gray-500 italic leading-relaxed">{desc}</p>
-            : null
-        ) : editingDesc ? (
-          <div className="space-y-1">
-            <textarea
-              rows={2}
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              autoFocus
-              placeholder="Add a description for this evidence…"
-              className="w-full text-xs border border-brand-300 rounded px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-brand-400"
-            />
-            <div className="flex gap-1">
-              <button onClick={saveDescription} disabled={saving}
-                className="text-xs font-medium bg-brand-600 text-white px-2 py-0.5 rounded hover:bg-brand-700">
-                {saving ? '…' : 'Save'}
-              </button>
-              <button onClick={() => { setEditingDesc(false); setDesc(file.description || ''); }}
-                className="text-xs text-gray-500 px-2 py-0.5 rounded hover:bg-gray-100">
-                Cancel
-              </button>
+          {/* Description */}
+          {readOnly ? (
+            desc ? <p className="text-[11px] text-gray-500 italic leading-relaxed">{desc}</p> : null
+          ) : editingDesc ? (
+            <div className="space-y-1 mt-1">
+              <textarea
+                rows={2}
+                value={desc}
+                onChange={(e) => setDesc(e.target.value)}
+                autoFocus
+                placeholder="Add a description…"
+                className="w-full text-xs border border-brand-300 rounded px-2 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-brand-400"
+              />
+              <div className="flex gap-1">
+                <button onClick={saveDescription} disabled={saving}
+                  className="text-xs font-medium bg-brand-600 text-white px-2 py-0.5 rounded hover:bg-brand-700">
+                  {saving ? '…' : 'Save'}
+                </button>
+                <button onClick={() => { setEditingDesc(false); setDesc(file.description || ''); }}
+                  className="text-xs text-gray-500 px-2 py-0.5 rounded hover:bg-gray-100">
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <button onClick={() => setEditingDesc(true)}
-            className="text-xs text-gray-400 hover:text-gray-600 italic w-full text-left">
-            {desc || <span className="hover:underline">+ Add description…</span>}
-          </button>
-        )}
-      </div>
+          ) : (
+            <button onClick={() => setEditingDesc(true)}
+              className="text-[11px] text-gray-400 hover:text-gray-600 italic text-left">
+              {desc || <span className="hover:underline">+ description</span>}
+            </button>
+          )}
+        </div>
 
-      {/* Action buttons */}
-      <div className="flex gap-2 px-3 pb-3">
-        {canDownload && (
-          <button
-            onClick={async (e) => {
-              e.stopPropagation();
-              try { await downloadFile(`/evidence/${file.id}/download`, file.file_name); }
-              catch { toast.error('Download failed'); }
-            }}
-            className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium bg-brand-600 hover:bg-brand-700 text-white rounded px-3 py-1.5 transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Download
-          </button>
-        )}
-        {!readOnly && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(file.id); }}
-            className="flex items-center justify-center gap-1 text-xs font-medium border border-red-200 text-red-500 hover:bg-red-50 rounded px-2.5 py-1.5 transition-colors"
-            title="Delete"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Delete
-          </button>
-        )}
+        {/* Action buttons */}
+        <div className="shrink-0 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {canPreview && (
+            <button
+              onClick={() => setPreviewing(true)}
+              className="text-[10px] font-medium text-brand-600 hover:text-brand-800 border border-brand-200 hover:border-brand-400 rounded px-2 py-0.5 transition-colors"
+              title="Preview"
+            >
+              Preview
+            </button>
+          )}
+          {canDownload && (
+            <button
+              onClick={async () => {
+                try { await downloadFile(`/evidence/${file.id}/download`, file.file_name); }
+                catch { toast.error('Download failed'); }
+              }}
+              className="text-[10px] font-medium text-gray-600 hover:text-gray-900 border border-gray-200 hover:border-gray-400 rounded px-2 py-0.5 transition-colors"
+              title="Download"
+            >
+              ↓ Save
+            </button>
+          )}
+          {!readOnly && (
+            <button
+              onClick={() => { if (confirm('Delete this file?')) onDelete(file.id); }}
+              className="text-[10px] font-medium text-red-500 hover:text-red-700 border border-red-100 hover:border-red-300 rounded px-2 py-0.5 transition-colors"
+              title="Delete"
+            >
+              Delete
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
+
+// ── Main EvidenceBlock ────────────────────────────────────────────────────────
 
 export default function EvidenceBlock({ step, onChange, readOnly = false, canDownload = true }) {
   const [uploading, setUploading] = useState(false);
@@ -150,7 +225,6 @@ export default function EvidenceBlock({ step, onChange, readOnly = false, canDow
   };
 
   const handleDelete = async (fileId) => {
-    if (!confirm('Delete this file?')) return;
     try {
       await api.delete(`/evidence/${fileId}`);
       onChange({ ...step, files: step.files.filter(f => f.id !== fileId) });
@@ -167,11 +241,12 @@ export default function EvidenceBlock({ step, onChange, readOnly = false, canDow
   const files = step.files || [];
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
+      {/* File list */}
       {files.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1.5">
           {files.map(f => (
-            <FilePreview
+            <FileCard
               key={f.id}
               file={f}
               onDelete={handleDelete}
@@ -183,44 +258,47 @@ export default function EvidenceBlock({ step, onChange, readOnly = false, canDow
         </div>
       )}
 
-      {/* Upload zone — only when not read-only */}
+      {/* Upload button — compact, inline */}
       {!readOnly && (
         <>
-          <div
-            className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer
-              ${uploading ? 'border-brand-300 bg-brand-50' : 'border-gray-300 hover:border-brand-400 hover:bg-gray-50'}`}
+          <button
             onClick={() => fileRef.current?.click()}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={async (e) => {
-              e.preventDefault();
-              fileRef.current.files = e.dataTransfer.files;
-              await handleUpload({ target: fileRef.current });
-            }}
+            disabled={uploading}
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-brand-600 border border-dashed border-gray-300 hover:border-brand-400 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
           >
             {uploading ? (
-              <p className="text-sm text-brand-600">Uploading…</p>
+              <>
+                <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Uploading…
+              </>
             ) : (
               <>
-                <svg className="w-6 h-6 mx-auto text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                 </svg>
-                <p className="text-sm text-gray-500">
-                  <span className="text-brand-600 font-medium">Click to upload</span> or drag & drop
-                </p>
-                <p className="text-xs text-gray-400 mt-0.5">Images, videos, PDFs, Word, Excel — up to 50MB</p>
+                Attach evidence
+                <span className="text-gray-400">· images, video, PDF, Word, Excel up to 50MB</span>
               </>
             )}
-          </div>
-          <input ref={fileRef} type="file" multiple className="hidden"
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            className="hidden"
             accept=".jpg,.jpeg,.png,.gif,.mp4,.mov,.pdf,.doc,.docx,.xls,.xlsx"
-            onChange={handleUpload} />
+            onChange={handleUpload}
+          />
         </>
       )}
 
       {/* Read-only empty state */}
       {readOnly && files.length === 0 && (
-        <p className="text-xs text-gray-400 italic">No evidence files attached to this step.</p>
+        <p className="text-xs text-gray-400 italic">No evidence files attached.</p>
       )}
     </div>
   );
