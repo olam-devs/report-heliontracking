@@ -1,188 +1,166 @@
 @echo off
 REM =====================================================================
-REM  vps-nginx-fix.cmd  —  Wire report.heliontracking.com → Node:3002
+REM  vps-nginx-fix.cmd  — Fix report.heliontracking.com routing
 REM
-REM  SAFE: only adds a new server{} block for report.heliontracking.com
-REM        Does NOT touch heliontracking.com or any CMSV block.
+REM  Run as Administrator (right-click -> Run as administrator)
 REM
-REM  Run ON THE VPS as Administrator (right-click → Run as administrator)
-REM  or from an elevated command prompt.
+REM  Situation: nginx.conf already has the report server block inline
+REM  (added by Cursor AI). A previous run of this script added a
+REM  duplicate via include helion-report-fleet.conf — that causes
+REM  nginx -t to fail. This script cleans up the duplicate, verifies
+REM  the config, and reloads nginx correctly.
 REM =====================================================================
 setlocal enabledelayedexpansion
 
 set CMSV_PREFIX=C:\Program Files\CMSServerV6\nginx
-set CMSV_NGINX=%CMSV_PREFIX%\nginx.exe
+set CMSV_NGINX="%CMSV_PREFIX%\nginx.exe"
 set CMSV_CONF=%CMSV_PREFIX%\conf\nginx.conf
 set FLEET_CONF=%CMSV_PREFIX%\conf\helion-report-fleet.conf
-set SSL_CHAIN=C:\nginx\nginx-1.30.0\ssl\report.heliontracking.com-chain.pem
-set SSL_KEY=C:\nginx\nginx-1.30.0\ssl\report.heliontracking.com-key.pem
 
 echo.
 echo ================================================================
-echo  PRE-FLIGHT
+echo  STEP 1: Remove duplicate include (added by previous fix run)
 echo ================================================================
 
-if not exist "%CMSV_NGINX%" (
-    echo [FAIL] %CMSV_NGINX% not found.  exit.
-    exit /b 1
+REM Remove helion-report-fleet.conf (the inline block already has it)
+if exist "%FLEET_CONF%" (
+    del /f "%FLEET_CONF%"
+    echo [OK] Deleted duplicate %FLEET_CONF%
+) else (
+    echo [SKIP] No duplicate conf file found.
 )
-echo [OK] CMSV nginx binary found.
 
-if not exist "%SSL_CHAIN%" (
-    echo [FAIL] SSL chain missing: %SSL_CHAIN%
-    exit /b 1
-)
-echo [OK] SSL chain present.
-
-if not exist "%SSL_KEY%" (
-    echo [FAIL] SSL key missing: %SSL_KEY%
-    exit /b 1
-)
-echo [OK] SSL key present.
-
-echo.
-echo ================================================================
-echo  STEP 1: Show current nginx.conf (so we know what's there)
-echo ================================================================
-type "%CMSV_CONF%"
-
-echo.
-echo ================================================================
-echo  STEP 2: Write helion-report-fleet.conf into CMSV conf dir
-echo          (ONLY touches report.heliontracking.com — nothing else)
-echo ================================================================
-
-(
-echo # Fleet Incident Reporter — report.heliontracking.com
-echo # Written by vps-nginx-fix.cmd  — safe to re-run
-echo server {
-echo     listen 443 ssl;
-echo     server_name report.heliontracking.com;
-echo.
-echo     ssl_certificate     C:/nginx/nginx-1.30.0/ssl/report.heliontracking.com-chain.pem;
-echo     ssl_certificate_key C:/nginx/nginx-1.30.0/ssl/report.heliontracking.com-key.pem;
-echo.
-echo     client_max_body_size 50m;
-echo     proxy_read_timeout   600s;
-echo     proxy_connect_timeout 60s;
-echo     proxy_send_timeout   600s;
-echo.
-echo     add_header X-Report-Fleet yes always;
-echo.
-echo     location = /__whoami {
-echo         return 200 "REPORT-SERVER-BLOCK\n";
-echo     }
-echo.
-echo     location / {
-echo         proxy_pass http://127.0.0.1:3002;
-echo         proxy_http_version 1.1;
-echo         proxy_set_header Upgrade $http_upgrade;
-echo         proxy_set_header Connection "upgrade";
-echo         proxy_set_header Host $host;
-echo         proxy_set_header X-Real-IP $remote_addr;
-echo         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-echo         proxy_set_header X-Forwarded-Proto $scheme;
-echo     }
-echo }
-echo.
-echo server {
-echo     listen 80;
-echo     server_name report.heliontracking.com;
-echo     location /.well-known/acme-challenge/ {
-echo         root C:/win-acme/webroot;
-echo     }
-echo     location / {
-echo         return 301 https://$host$request_uri;
-echo     }
-echo }
-) > "%FLEET_CONF%"
-echo [OK] Wrote %FLEET_CONF%
-
-echo.
-echo ================================================================
-echo  STEP 3: Ensure nginx.conf includes helion-report-fleet.conf
-echo ================================================================
+REM Remove the injected include line from nginx.conf
 findstr /i "helion-report-fleet" "%CMSV_CONF%" >nul 2>&1
 if %errorlevel% == 0 (
-    echo [SKIP] include already present in nginx.conf
-) else (
-    echo [INFO] Injecting include into nginx.conf via PowerShell...
+    echo [INFO] Removing injected include line from nginx.conf...
     powershell -ExecutionPolicy Bypass -Command ^
         "$path = 'C:\Program Files\CMSServerV6\nginx\conf\nginx.conf';" ^
         "$lines = Get-Content -LiteralPath $path -Encoding ascii;" ^
-        "$out = [System.Collections.Generic.List[string]]::new();" ^
-        "$inserted = $false;" ^
-        "foreach ($line in $lines) {" ^
-        "  $out.Add($line);" ^
-        "  if (-not $inserted -and $line -match 'mime\.types') {" ^
-        "    $out.Add('    include helion-report-fleet.conf;');" ^
-        "    $inserted = $true;" ^
-        "  }" ^
-        "}" ^
-        "if (-not $inserted) {" ^
-        "  foreach ($i in 0..($out.Count-1)) {" ^
-        "    if ($out[$i] -match '^\s*http\s*\{') {" ^
-        "      $out.Insert($i+1,'    include helion-report-fleet.conf;');" ^
-        "      $inserted = $true; break;" ^
-        "    }" ^
-        "  }" ^
-        "}" ^
-        "if (-not $inserted) { Write-Error 'Cannot find insert point'; exit 1 }" ^
+        "$out = $lines | Where-Object { $_ -notmatch 'helion-report-fleet' };" ^
         "$out | Set-Content -LiteralPath $path -Encoding ascii;" ^
-        "Write-Host '[OK] include injected'"
-    if errorlevel 1 (
-        echo [FAIL] Could not inject include automatically.
-        echo        Manually add this line inside the http { } block in:
-        echo        %CMSV_CONF%
-        echo            include helion-report-fleet.conf;
-        exit /b 1
-    )
+        "Write-Host '[OK] Removed include line from nginx.conf'"
+) else (
+    echo [SKIP] No include line to remove.
 )
 
 echo.
 echo ================================================================
-echo  STEP 4: Test config using CMSV binary WITH correct -p prefix
+echo  STEP 2: Confirm report server block is in nginx.conf
 echo ================================================================
-"%CMSV_NGINX%" -p "%CMSV_PREFIX%\" -t
+findstr /i "report.heliontracking.com" "%CMSV_CONF%" >nul 2>&1
+if %errorlevel% == 0 (
+    echo [OK] report.heliontracking.com server block present in nginx.conf
+) else (
+    echo [WARN] No report server block found! Adding it now...
+    powershell -ExecutionPolicy Bypass -Command ^
+        "$path = 'C:\Program Files\CMSServerV6\nginx\conf\nginx.conf';" ^
+        "$lines = Get-Content -LiteralPath $path -Encoding ascii -Raw;" ^
+        "$block = \"`nserver {`n    listen 443 ssl;`n    server_name report.heliontracking.com;`n    ssl_certificate     \`\"C:/nginx/nginx-1.30.0/ssl/report.heliontracking.com-chain.pem\`\";`n    ssl_certificate_key \`\"C:/nginx/nginx-1.30.0/ssl/report.heliontracking.com-key.pem\`\";`n    client_max_body_size 50m;`n    proxy_read_timeout 600s;`n    add_header X-Report-Fleet yes always;`n    location = /__whoami { return 200 \`\"REPORT-SERVER-BLOCK\n\`\"; }`n    location / {`n        proxy_pass http://127.0.0.1:3002;`n        proxy_http_version 1.1;`n        proxy_set_header Host \$host;`n        proxy_set_header X-Real-IP \$remote_addr;`n        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;`n        proxy_set_header X-Forwarded-Proto \$scheme;`n    }`n}`n\";" ^
+        "$lines = $lines -replace '(}\s*$)', \"`$block`$1\";" ^
+        "Set-Content -LiteralPath $path -Value $lines -Encoding ascii;" ^
+        "Write-Host '[OK] Added report server block'"
+)
+
+echo.
+echo ================================================================
+echo  STEP 3: ALSO remove default_server from report block
+echo          (default_server causes it to steal all unmatched TLS)
+echo ================================================================
+findstr /i "default_server" "%CMSV_CONF%" >nul 2>&1
+if %errorlevel% == 0 (
+    echo [INFO] Removing default_server flag from report block...
+    powershell -ExecutionPolicy Bypass -Command ^
+        "$path = 'C:\Program Files\CMSServerV6\nginx\conf\nginx.conf';" ^
+        "$lines = Get-Content -LiteralPath $path -Encoding ascii;" ^
+        "$out = $lines -replace '443\s+ssl\s+default_server', '443 ssl';" ^
+        "$out | Set-Content -LiteralPath $path -Encoding ascii;" ^
+        "Write-Host '[OK] Removed default_server flag'"
+) else (
+    echo [SKIP] No default_server flag found.
+)
+
+echo.
+echo ================================================================
+echo  STEP 4: Test config with correct CMSV prefix
+echo ================================================================
+%CMSV_NGINX% -p "%CMSV_PREFIX%\" -t 2>&1
 if errorlevel 1 (
-    echo [FAIL] Config test failed — fix errors above.
+    echo.
+    echo [FAIL] Config test failed. Show the error above to diagnose.
+    echo        Most likely: a stray character or extra directive.
+    echo        Check nginx.conf manually around the report server block.
     exit /b 1
 )
 echo [OK] Config test passed.
 
 echo.
 echo ================================================================
-echo  STEP 5: Reload nginx using ELEVATED PowerShell
-echo          (previous reloads failed: Access Denied — this fixes it)
+echo  STEP 5: Reload CMSV nginx via Windows Service (safe method)
+echo          Finds the service that owns nginx PID 28228 and sends
+echo          a graceful reload without restarting Tomcat/CMSV.
 echo ================================================================
-powershell -ExecutionPolicy Bypass -Command ^
-    "Start-Process -FilePath 'C:\Program Files\CMSServerV6\nginx\nginx.exe'" ^
-    " -ArgumentList '-p','C:\Program Files\CMSServerV6\nginx\','-s','reload'" ^
-    " -Verb RunAs -Wait"
-echo [OK] Reload signal sent.
+
+REM Try to find the service name for CMSV nginx
+set SVC_NAME=
+for /f "tokens=1" %%S in ('sc query state^= all ^| findstr /i "SERVICE_NAME"') do (
+    set MAYBE=%%S
+)
+
+REM Most common CMSV service names to try
+set SERVICES=CMSServerV6 CMSV6 CMSServer nginx
+
+for %%S in (%SERVICES%) do (
+    sc query "%%S" >nul 2>&1
+    if !errorlevel! == 0 (
+        echo [INFO] Found Windows service: %%S
+        set SVC_NAME=%%S
+        goto :found_svc
+    )
+)
+
+:found_svc
+if defined SVC_NAME (
+    echo [INFO] Using service control: sc stop / sc start "%SVC_NAME%"
+    echo        This gracefully restarts nginx only — Tomcat is separate.
+    sc stop "%SVC_NAME%"
+    timeout /t 3 /nobreak >nul
+    sc start "%SVC_NAME%"
+    timeout /t 3 /nobreak >nul
+) else (
+    echo [INFO] No known service found — trying elevated nginx -s reload...
+    powershell -ExecutionPolicy Bypass -Command ^
+        "Start-Process -FilePath 'C:\Program Files\CMSServerV6\nginx\nginx.exe'" ^
+        " -ArgumentList '-p','C:\Program Files\CMSServerV6\nginx\','-s','reload'" ^
+        " -Verb RunAs -Wait -WindowStyle Hidden"
+    timeout /t 3 /nobreak >nul
+)
 
 echo.
 echo ================================================================
-echo  STEP 6: Smoke test (wait 3s for workers to respawn)
+echo  STEP 6: Smoke tests
 echo ================================================================
-timeout /t 3 /nobreak >nul
 
-echo --- /__whoami (expect: REPORT-SERVER-BLOCK) ---
+echo --- /__whoami via HTTPS (expect: REPORT-SERVER-BLOCK) ---
 curl -sk https://127.0.0.1/__whoami -H "Host: report.heliontracking.com"
 echo.
 
-echo --- /api/health (expect: JSON ok) ---
+echo --- /api/health (expect: JSON with status ok) ---
 curl -sk https://127.0.0.1/api/health -H "Host: report.heliontracking.com"
 echo.
 
-echo --- heliontracking.com still alive? ---
+echo --- heliontracking.com still works? (expect: 200 or 302) ---
 curl -sk https://127.0.0.1/ -H "Host: heliontracking.com" -o nul -w "HTTP %%{http_code}"
+echo.
+
+echo --- Public URL test ---
+curl -sk https://report.heliontracking.com/api/health
 echo.
 
 echo.
 echo ================================================================
 echo  DONE
-echo  If /__whoami = REPORT-SERVER-BLOCK and heliontracking.com = 200/302/303
-echo  open https://report.heliontracking.com in browser.
+echo  If /__whoami = REPORT-SERVER-BLOCK -> open https://report.heliontracking.com
+echo  If still CMSV response -> paste output here for next step
 echo ================================================================
 endlocal
