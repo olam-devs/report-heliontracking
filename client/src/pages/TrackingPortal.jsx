@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { NavLink, Outlet, Navigate, useLocation } from "react-router-dom";
 import useTrackingAccess from "../tracking/useTrackingAccess.js";
 import DailyReport from "../tracking/DailyReport.jsx";
+import { isUnknownPoint } from "../tracking/coordUtils.js";
 
 const tabClass = ({ isActive }) =>
   `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -30,6 +31,9 @@ function Placeholder({ title, children }) {
 }
 
 function LocationLink({ point, label }) {
+  if (isUnknownPoint(point)) {
+    return <span className="text-amber-800 text-sm font-medium">Unknown location (invalid GPS)</span>;
+  }
   const url = point?.mapsUrl || point?.map?.url;
   if (!url) return <span className="text-gray-400">—</span>;
   return (
@@ -69,6 +73,14 @@ function AlertCard({ alert }) {
   const cls = sevColors[alert.severity] || "border-gray-200 bg-white";
   const routeUrl = alert.mapsRouteUrl;
   const segs = alert.segments || {};
+  const fmtFuel = (pt) => {
+    const f = pt?.fuel;
+    if (f == null) return "Unknown";
+    const n = Number(f);
+    if (!Number.isFinite(n) || n <= 5) return "Unknown";
+    return `${n}L`;
+  };
+  const theft = alert.theft || null;
 
   return (
     <div className={`border rounded-lg p-4 ${cls}`}>
@@ -93,6 +105,12 @@ function AlertCard({ alert }) {
         </div>
       )}
 
+      {theft && alert.kind !== "stale_sensor" && (
+        <div className="text-xs text-gray-700 mb-2">
+          <strong>Theft points:</strong> {theft.fromLabel} → {theft.toLabel} (−{theft.litres}L)
+        </div>
+      )}
+
       {alert.kind === "stale_sensor" && (
         <div className="text-sm mb-2 space-y-1">
           <div>Sensor frozen at <strong>{alert.litresFrozen}L</strong> → resumed <strong>{alert.litresResumed}L</strong></div>
@@ -105,37 +123,57 @@ function AlertCard({ alert }) {
         </div>
       )}
 
-      <div className={`grid gap-3 text-sm ${alert.pointC ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+      <div className={`grid gap-3 text-sm ${(alert.pointA0 && alert.pointC) ? "md:grid-cols-4" : (alert.pointA0 || alert.pointC) ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+        {alert.pointA0 && (
+          <div>
+            <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Point A0 (prev valid)</div>
+            <LocationLink point={alert.pointA0} />
+            <div className="text-xs text-gray-500 mt-1">{alert.pointA0?.timeStr}</div>
+            <div className="text-xs text-gray-700 mt-1"><strong>Fuel:</strong> {fmtFuel(alert.pointA0)}</div>
+          </div>
+        )}
         <div>
           <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Point A (from)</div>
           <LocationLink point={alert.from} />
           <div className="text-xs text-gray-500 mt-1">{alert.from?.timeStr}</div>
+          <div className="text-xs text-gray-700 mt-1"><strong>Fuel:</strong> {fmtFuel(alert.from)}</div>
         </div>
         <div>
           <div className="text-xs font-semibold text-gray-500 uppercase mb-1">
-            Point B (to){alert.to?.unknown ? " — unknown" : ""}
+            Point B (to){isUnknownPoint(alert.to) ? " — unknown" : ""}
           </div>
-          {alert.to?.unknown ? (
-            <span className="text-amber-800 text-sm font-medium">Unknown location (invalid GPS)</span>
-          ) : (
-            <LocationLink point={alert.to} />
-          )}
+          <LocationLink point={alert.to} />
           <div className="text-xs text-gray-500 mt-1">{alert.to?.timeStr}</div>
+          <div className="text-xs text-gray-700 mt-1"><strong>Fuel:</strong> {fmtFuel(alert.to)}</div>
         </div>
         {alert.pointC && (
           <div>
             <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Point C (next valid GPS)</div>
             <LocationLink point={alert.pointC} />
             <div className="text-xs text-gray-500 mt-1">{alert.pointC?.timeStr}</div>
+            <div className="text-xs text-gray-700 mt-1"><strong>Fuel:</strong> {fmtFuel(alert.pointC)}</div>
           </div>
         )}
       </div>
 
-      {(segs.aToB || segs.aToC || segs.bToC) && (
+      {isUnknownPoint(alert.to) && (
+        <div className="mt-3 text-xs text-gray-700 border border-amber-200 bg-amber-50/60 rounded-md p-2">
+          <div className="font-semibold text-amber-900 mb-1">Point B has invalid GPS</div>
+          <div className="flex flex-wrap gap-3">
+            <span><strong>Fuel @A:</strong> {fmtFuel(alert.from)}</span>
+            <span><strong>Fuel @B:</strong> {fmtFuel(alert.to)}</span>
+            {segs.aToB?.fuelUsed != null && <span><strong>A→B fuel used:</strong> {segs.aToB.fuelUsed}L</span>}
+          </div>
+        </div>
+      )}
+
+      {(segs.a0ToA || segs.aToB || segs.aToC || segs.bToC || segs.a0ToC) && (
         <div className="mt-3 grid md:grid-cols-3 gap-2">
+          {segs.a0ToA && <SegmentRow label="A0 → A fuel & route" seg={segs.a0ToA} />}
           <SegmentRow label="A → B fuel & route" seg={segs.aToB} />
           {segs.aToC && <SegmentRow label="A → C fuel & route" seg={segs.aToC} />}
           {segs.bToC && <SegmentRow label="B → C fuel & route" seg={segs.bToC} />}
+          {segs.a0ToC && <SegmentRow label="A0 → C fuel & route" seg={segs.a0ToC} />}
         </div>
       )}
 
@@ -145,7 +183,7 @@ function AlertCard({ alert }) {
       </div>
 
       <div className="flex flex-wrap gap-2 mt-3">
-        {routeUrl && !alert.to?.unknown && (
+        {routeUrl && !isUnknownPoint(alert.to) && (
           <a href={routeUrl} target="_blank" rel="noreferrer" className="inline-flex text-sm btn btn-primary py-1.5 px-3">
             View route A → B
           </a>
@@ -165,7 +203,7 @@ function AlertCard({ alert }) {
             Point A
           </a>
         )}
-        {!alert.to?.unknown && alert.mapsToUrl && (
+        {!isUnknownPoint(alert.to) && alert.mapsToUrl && (
           <a href={alert.mapsToUrl} target="_blank" rel="noreferrer" className="text-xs btn btn-secondary py-1.5 px-2">
             Point B
           </a>

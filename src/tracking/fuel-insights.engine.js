@@ -15,7 +15,92 @@ const {
 
 const NOTIF_FILE = path.join(__dirname, '../../data/tracking/notifications.json');
 const NOTIFICATION_MIN_LITRES = 10;
+/** Fuel at/below this = sensor dead, tampered, or not reporting (e.g. 0L). */
+const MIN_VALID_FUEL_L = 5;
 const NOTIFICATION_KINDS = new Set(['fuel_drop', 'offline_return_theft']);
+
+function isTamperFuel(fuel) {
+  if (fuel == null) return true;
+  const f = Number(fuel);
+  return !Number.isFinite(f) || f <= MIN_VALID_FUEL_L;
+}
+
+function findRecoveryFuelPoint(series, afterTime) {
+  if (!series?.length || afterTime == null) return null;
+  for (const p of series) {
+    if (p.time <= afterTime) continue;
+    if (!isTamperFuel(p.fuel)) return p;
+  }
+  return null;
+}
+
+function findNextValidGpsAndFuelPoint(series, afterTime) {
+  if (!series?.length || afterTime == null) return null;
+  for (const p of series) {
+    if (p.time <= afterTime) continue;
+    if (!isTamperFuel(p.fuel) && isValidCoord(p.lat, p.lng)) return p;
+  }
+  return null;
+}
+
+function findPrevValidGpsAndFuelPoint(series, beforeTime) {
+  if (!series?.length || beforeTime == null) return null;
+  for (let i = series.length - 1; i >= 0; i--) {
+    const p = series[i];
+    if (p.time >= beforeTime) continue;
+    if (!isTamperFuel(p.fuel) && isValidCoord(p.lat, p.lng)) return p;
+  }
+  return null;
+}
+
+/**
+ * Notifications only when fuel sensor is working again.
+ *
+ * Point definitions:
+ * - A: point before the drop (valid fuel)
+ * - B: first point where fuel is back to valid (recovery). GPS may be invalid → mark B unknown.
+ * - C: next point after B where both GPS + fuel are valid (only when B GPS invalid)
+ */
+function prepareNotificationDrop(drop, series) {
+  if (!series?.length) return null;
+
+  const fromPoint = drop.fromPoint;
+  const rawTo = drop.toPoint;
+
+  // If the "after" fuel is tampered (0L), defer until recovery (fuel is valid again).
+  if (isTamperFuel(drop.fuelAfter)) {
+    const recovery = findRecoveryFuelPoint(series, drop.time);
+    if (!recovery) return null;
+
+    const litres = Math.round((drop.fuelBefore - recovery.fuel) * 10) / 10;
+    if (litres < NOTIFICATION_MIN_LITRES) return null;
+
+    const bGpsInvalid = isInvalidCoord(recovery.lat, recovery.lng);
+    const pointC = bGpsInvalid ? findNextValidGpsAndFuelPoint(series, recovery.time) : null;
+    if (bGpsInvalid && !pointC) return null;
+
+    return {
+      ...drop,
+      litres,
+      fuelAfter: recovery.fuel,
+      fromPoint,
+      // B = recovery point (fuel valid), GPS might be invalid but fuel must be real.
+      toPoint: { ...recovery, unknown: bGpsInvalid },
+      deferredTamper: true,
+      pointCHint: pointC ? { ...pointC } : null,
+      // Keep "at" as the recovery time so newest ordering matches the moment fuel came back.
+      at: recovery.timeStr || new Date(recovery.time).toISOString(),
+      time: recovery.time,
+    };
+  }
+
+  // Normal drop where fuelAfter is valid: B stays as the toPoint from the drop.
+  // If B GPS invalid, we still keep B fuel (valid) and add C as next valid GPS+fuel.
+  const bGpsInvalid = isInvalidCoord(rawTo?.lat, rawTo?.lng);
+  const pointC = bGpsInvalid ? findNextValidGpsAndFuelPoint(series, rawTo?.time) : null;
+  if (bGpsInvalid && !pointC) return null;
+  return bGpsInvalid ? { ...drop, pointCHint: pointC } : drop;
+}
 
 function loadNotifications() {
   try {
@@ -68,7 +153,9 @@ async function enrichPoint(pt, { unknown = false } = {}) {
 function segmentMetrics(fromPt, toPt) {
   if (!fromPt || !toPt) return null;
   const fuelUsed = fromPt.fuel != null && toPt.fuel != null
-    ? Math.round((fromPt.fuel - toPt.fuel) * 10) / 10
+    ? (isTamperFuel(toPt.fuel)
+      ? Math.round(fromPt.fuel * 10) / 10
+      : Math.round((fromPt.fuel - toPt.fuel) * 10) / 10)
     : null;
   const bothCoords = isValidCoord(fromPt.lat, fromPt.lng) && isValidCoord(toPt.lat, toPt.lng);
   const km = bothCoords ? haversineKm(fromPt, toPt) : null;
@@ -83,17 +170,36 @@ function segmentMetrics(fromPt, toPt) {
 }
 
 function resolveDropPoints(drop, series) {
-  const fromPoint = { ...drop.fromPoint };
+  let fromPoint = { ...drop.fromPoint };
   let toPoint = { ...drop.toPoint };
-  let pointC = null;
+  let pointC = drop.pointCHint ? { ...drop.pointCHint } : null;
+  let pointA0 = null;
+
+  // If A has invalid GPS or invalid fuel, backtrack to last point with GPS+fuel valid.
+  const aGpsInvalid = isInvalidCoord(fromPoint.lat, fromPoint.lng);
+  const aFuelInvalid = isTamperFuel(fromPoint.fuel);
+  if (aGpsInvalid || aFuelInvalid) {
+    const prev = findPrevValidGpsAndFuelPoint(series, fromPoint.time);
+    if (prev) pointA0 = { ...prev };
+    // A becomes "unknown" (bad GPS) but keep a valid fuel reading if possible.
+    fromPoint = {
+      ...fromPoint,
+      unknown: aGpsInvalid,
+      fuel: aFuelInvalid && prev ? prev.fuel : fromPoint.fuel,
+    };
+  }
+
   const toInvalid = isInvalidCoord(toPoint.lat, toPoint.lng);
   if (toInvalid) {
+    // GPS invalid, but fuel may be valid (we still show it).
     toPoint = { ...toPoint, unknown: true };
-    const idx = findSeriesIndex(series, drop.toPoint);
-    const next = findNextValidPoint(series, drop.toPoint?.time ?? (idx >= 0 ? series[idx]?.time : null));
-    if (next) pointC = { ...next };
+    if (!pointC) {
+      const idx = findSeriesIndex(series, drop.toPoint);
+      const next = findNextValidGpsAndFuelPoint(series, drop.toPoint?.time ?? (idx >= 0 ? series[idx]?.time : null));
+      if (next) pointC = { ...next };
+    }
   }
-  return { fromPoint, toPoint, pointC, toInvalid };
+  return { pointA0, fromPoint, toPoint, pointC, toInvalid };
 }
 
 function attachMapLinks(alert) {
@@ -110,29 +216,50 @@ function attachMapLinks(alert) {
 
 async function buildDropAlert({ devIdno, plate, drop, kind = 'fuel_drop', extra = {}, series = null }) {
   const resolved = series ? resolveDropPoints(drop, series) : {
+    pointA0: null,
     fromPoint: drop.fromPoint,
     toPoint: drop.toPoint,
     pointC: null,
     toInvalid: isInvalidCoord(drop.toPoint?.lat, drop.toPoint?.lng),
   };
-  const from = await enrichPoint(resolved.fromPoint);
+  const pointA0 = resolved.pointA0 ? await enrichPoint(resolved.pointA0) : null;
+  const from = await enrichPoint(resolved.fromPoint, { unknown: resolved.fromPoint?.unknown });
   const to = await enrichPoint(resolved.toPoint, { unknown: resolved.toInvalid });
   const pointC = resolved.pointC ? await enrichPoint(resolved.pointC) : null;
 
   const rawA = resolved.fromPoint;
   const rawB = resolved.toPoint;
   const rawC = resolved.pointC;
+  const rawA0 = resolved.pointA0;
 
   const segments = {
+    a0ToA: rawA0 ? segmentMetrics(rawA0, rawA) : null,
     aToB: segmentMetrics(rawA, rawB),
     aToC: rawC ? segmentMetrics(rawA, rawC) : null,
     bToC: rawC ? segmentMetrics(rawB, rawC) : null,
+    a0ToC: rawA0 && rawC ? segmentMetrics(rawA0, rawC) : null,
   };
 
-  const km = segments.aToB?.distanceKm ?? pathDistanceKm([rawA, rawB]) ?? haversineKm(from, to);
-  const timeMs = segments.aToB?.durationMs ?? (
+  let km = segments.aToB?.distanceKm;
+  if (km == null && !resolved.toInvalid && isValidCoord(rawB.lat, rawB.lng)) {
+    km = pathDistanceKm([rawA, rawB]) ?? haversineKm(from, to);
+  }
+  if (km == null && rawC && segments.aToC?.distanceKm != null) {
+    km = segments.aToC.distanceKm;
+  }
+  if (km == null && rawA0 && rawC && segments.a0ToC?.distanceKm != null) {
+    km = segments.a0ToC.distanceKm;
+  }
+  let timeMs = segments.aToB?.durationMs ?? (
     drop.fromPoint?.time && drop.toPoint?.time ? drop.toPoint.time - drop.fromPoint.time : null
   );
+  if (drop.deferredTamper && drop.recoveryPoint?.time && drop.fromPoint?.time) {
+    timeMs = drop.recoveryPoint.time - drop.fromPoint.time;
+  }
+  if (rawA0 && rawC && segments.a0ToC?.durationMs != null) {
+    // Total driving window when we have a complete valid path anchor (A0) and valid end (C).
+    timeMs = segments.a0ToC.durationMs;
+  }
   const severity = theftLevel(drop.litres);
   const alert = attachMapLinks({
     id: `${devIdno}-${drop.time}-${kind}`,
@@ -145,6 +272,7 @@ async function buildDropAlert({ devIdno, plate, drop, kind = 'fuel_drop', extra 
     at: drop.timeStr || new Date(drop.time).toISOString(),
     severity: severity.level,
     severityLabel: severity.label,
+    pointA0,
     from,
     to,
     pointC,
@@ -152,6 +280,14 @@ async function buildDropAlert({ devIdno, plate, drop, kind = 'fuel_drop', extra 
     distanceKm: km,
     duration: formatDuration(timeMs),
     durationMs: timeMs,
+    theft: {
+      fromLabel: 'A',
+      toLabel: 'B',
+      litres: drop.litres,
+      fuelBefore: from?.fuel ?? drop.fuelBefore,
+      fuelAfter: to?.fuel ?? drop.fuelAfter,
+      at: drop.timeStr || new Date(drop.time).toISOString(),
+    },
     createdAt: new Date().toISOString(),
     ...extra,
   });
@@ -344,15 +480,19 @@ async function analyzeVehicleTracks({
 
   for (const d of drops) {
     if (forNotifications && d.litres < NOTIFICATION_MIN_LITRES) continue;
-    alerts.push(await buildDropAlert({ devIdno, plate, drop: d, kind: 'fuel_drop', series }));
+    const prepared = forNotifications ? prepareNotificationDrop(d, series) : d;
+    if (forNotifications && !prepared) continue;
+    alerts.push(await buildDropAlert({ devIdno, plate, drop: prepared, kind: 'fuel_drop', series }));
   }
 
   for (const off of detectOfflineReturnTheft(series, { minDropL: offlineMinL })) {
     if (forNotifications && off.litres < NOTIFICATION_MIN_LITRES) continue;
+    const prepared = forNotifications ? prepareNotificationDrop(off, series) : off;
+    if (forNotifications && !prepared) continue;
     alerts.push(await buildDropAlert({
       devIdno,
       plate,
-      drop: off,
+      drop: prepared,
       kind: 'offline_return_theft',
       series,
       extra: {
@@ -444,6 +584,22 @@ function purgeAllUncalibratedNotifications(getVehicleMeta) {
   const store = loadNotifications();
   const before = (store.items || []).length;
   store.items = (store.items || []).filter((a) => isCalibrated(getVehicleMeta(a.devIdno)));
+  const removed = before - store.items.length;
+  if (removed > 0) saveNotifications(store);
+  return removed;
+}
+
+/** Remove stored alerts with dead-sensor 0L reads or 0,0 GPS shown as real locations. */
+function purgeMalformedNotifications() {
+  const store = loadNotifications();
+  const before = (store.items || []).length;
+  store.items = (store.items || []).filter((a) => {
+    if (!NOTIFICATION_KINDS.has(a.kind)) return true;
+    if (a.fuelAfter != null && isTamperFuel(a.fuelAfter)) return false;
+    const to = a.to || {};
+    if (!to.unknown && isInvalidCoord(to.lat, to.lng)) return false;
+    return true;
+  });
   const removed = before - store.items.length;
   if (removed > 0) saveNotifications(store);
   return removed;
@@ -551,7 +707,10 @@ module.exports = {
   mergeNotifications,
   purgeNotificationsForVehicle,
   purgeAllUncalibratedNotifications,
+  purgeMalformedNotifications,
   filterCalibratedAlerts,
+  isTamperFuel,
+  MIN_VALID_FUEL_L,
   searchAlerts,
   countUnread,
   isSeriousTheftAlert,

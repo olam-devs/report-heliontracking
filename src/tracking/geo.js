@@ -2,11 +2,14 @@ function toRad(d) {
   return (d * Math.PI) / 180;
 }
 
+const { isInvalidCoord } = require('./coord-utils');
+
 function coordsOf(p) {
   if (!p) return null;
   const lat = p.lat ?? p.map?.lat;
   const lng = p.lng ?? p.map?.lng;
   if (lat == null || lng == null) return null;
+  if (isInvalidCoord(lat, lng)) return null;
   return { lat: Number(lat), lng: Number(lng) };
 }
 

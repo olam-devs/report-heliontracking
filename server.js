@@ -43,7 +43,7 @@ app.use('/api/tracking', require('./src/routes/tracking'));
 
 const { startNotificationScanner } = require('./src/tracking/notification-scanner.service');
 const dailyLog = require('./src/tracking/lib/services/daily-log.service');
-const { purgeAllUncalibratedNotifications } = require('./src/tracking/fuel-insights.engine');
+const { purgeAllUncalibratedNotifications, purgeMalformedNotifications } = require('./src/tracking/fuel-insights.engine');
 const { rebuildDangerZonesFromNotifications } = require('./src/tracking/danger-zones.service');
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
@@ -64,6 +64,8 @@ app.listen(PORT, () => {
       dailyLog.refreshVehicleMetaFromDisk();
       const purged = purgeAllUncalibratedNotifications((id) => dailyLog.getVehicleMeta(id));
       if (purged > 0) console.log(`[notifications] removed ${purged} stored alert(s) for uncalibrated vehicles`);
+      const malformed = purgeMalformedNotifications();
+      if (malformed > 0) console.log(`[notifications] removed ${malformed} malformed alert(s) (0L / invalid GPS)`);
       const dz = rebuildDangerZonesFromNotifications((id) => dailyLog.getVehicleMeta(id));
       console.log(`[danger-zones] indexed ${dz} point(s) from notifications`);
     } catch (e) {

@@ -60,4 +60,4 @@ function markRangeCovered(fromTs, toTs, plate = '') {
   saveCoverage(store);
 }
 
-module.exports = { loadCoverage, isRangeCovered, markRangeCovered, parseMs };
+module.exports = { loadCoverage, saveCoverage, isRangeCovered, markRangeCovered, parseMs };
