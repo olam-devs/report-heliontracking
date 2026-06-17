@@ -321,6 +321,28 @@ exports.triggerNotificationScan = async (req, res) => {
 
 exports.searchAlerts = exports.listNotifications;
 
+exports.createVehicleEntry = (req, res) => {
+  try {
+    dailyLog.refreshVehicleMetaFromDisk();
+    const body = req.body || {};
+    const note = String(body.manualNote || body.note || '').trim();
+    if (!note) return err(res, 'Note text is required', 400);
+    const devIdno = String(body.devIdno || '').trim();
+    if (!devIdno) return err(res, 'devIdno is required', 400);
+    const entry = dailyLog.createEntry({
+      devIdno,
+      plate: body.plate || '',
+      manualNote: note,
+      reportDate: body.reportDate || dailyLog.todayStr(),
+      fields: { type: body.entryType || 'note' },
+      createdBy: req.user?.name || req.user?.email || 'user',
+    });
+    ok(res, entry);
+  } catch (e) {
+    err(res, e.message, 500);
+  }
+};
+
 exports.vehicleHistory = (req, res) => {
   try {
     dailyLog.refreshVehicleMetaFromDisk();

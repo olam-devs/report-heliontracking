@@ -14,6 +14,7 @@ router.get('/vehicles', requireAnyTrackingPage(VEHICLE_PAGES, 'view'), c.vehicle
 
 router.get('/daily-log/report/quick', requireTrackingPage('daily_report', 'view'), c.reportQuick);
 router.patch('/daily-log/report/:id', requireAnyTrackingPage(['daily_report', 'calibration'], 'edit'), c.patchVehicle);
+router.post('/daily-log/entries', requireTrackingPage('daily_report', 'edit'), c.createVehicleEntry);
 router.get('/daily-log/vehicle/:id/history', requireTrackingPage('daily_report', 'view'), c.vehicleHistory);
 router.get('/daily-log/vehicle/:id/manual-history', requireTrackingPage('daily_report', 'view'), c.vehicleManualHistory);
 router.post('/daily-log/bulk-bundle', requireTrackingPage('daily_report', 'edit'), c.bulkBundle);

@@ -195,14 +195,18 @@ export default function VehicleEditDrawer({
             <CameraEditor value={cameraDraft} onChange={setCameraDraft} disabled={saving} />
           </div>
 
+          {/* ── Background / permanent vehicle notes ── */}
           <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6 }}>
-              Day notes (saved with vehicle — not duplicated in history)
+            <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 4 }}>
+              Background notes (not shown in table)
+            </div>
+            <div style={{ fontSize: 10, color: t.textSoft, marginBottom: 6 }}>
+              Internal notes saved with the vehicle record. Only the latest log entry (below) shows in the fleet table.
             </div>
             <textarea
               value={noteDraft}
               onChange={(e) => setNoteDraft(e.target.value)}
-              rows={4}
+              rows={3}
               style={{
                 width: "100%",
                 boxSizing: "border-box",
@@ -219,15 +223,28 @@ export default function VehicleEditDrawer({
             {saving ? "Saving…" : "Save vehicle record"}
           </Btn>
 
-          <div style={{ marginTop: 20, borderTop: `1px solid ${t.border}`, paddingTop: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6 }}>
-              Add history entry (unlimited per day)
+          {/* ── Add a note — shows in NOTES column of fleet table ── */}
+          <div
+            style={{
+              marginTop: 20,
+              borderTop: `1px solid ${t.border}`,
+              paddingTop: 14,
+              background: t.accentSoft,
+              borderRadius: 10,
+              padding: "12px 10px",
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 2, color: t.accent }}>
+              ✏ Add note
+            </div>
+            <div style={{ fontSize: 10, color: t.textSoft, marginBottom: 8 }}>
+              The latest note shows in the NOTES column of the fleet table. Your name is attached automatically.
             </div>
             <textarea
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
               rows={2}
-              placeholder="Separate log entry (kept forever)…"
+              placeholder="Type a note and click Add…"
               style={{
                 width: "100%",
                 boxSizing: "border-box",
@@ -243,34 +260,54 @@ export default function VehicleEditDrawer({
               disabled={saving || !newNote.trim()}
               style={{ marginTop: 6, width: "100%" }}
             >
-              Add to history
+              {saving ? "Saving…" : "Add note"}
             </Btn>
           </div>
 
+          {/* ── Note history ── */}
           {manualHistory.length > 0 && (
             <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 8 }}>All records</div>
-              {manualHistory.map((ent) => (
-                <div
-                  key={ent.id}
-                  style={{
-                    marginBottom: 8,
-                    padding: 8,
-                    background: t.bg,
-                    borderRadius: 8,
-                    fontSize: 10,
-                    borderLeft: `3px solid ${ent.fields?.type === "cameras" ? t.orange : t.accent}`,
-                  }}
-                >
-                  <div style={{ fontWeight: 700 }}>
-                    {ent.fields?.type || "note"} · {fmtDay(ent.reportDate)} · {fmtTs(ent.recordedAt)}
-                    {ent.createdBy ? (
-                      <span style={{ color: t.textSoft, fontWeight: 600 }}> · by {ent.createdBy}</span>
-                    ) : null}
+              <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 8 }}>
+                Note history ({manualHistory.length})
+              </div>
+              {manualHistory.map((ent, idx) => {
+                const isNote = !ent.fields?.type || ent.fields.type === "note" || ent.fields.type === "notes";
+                const isLatestNote = isNote && idx === manualHistory.findIndex((e) => !e.fields?.type || e.fields.type === "note" || e.fields.type === "notes");
+                return (
+                  <div
+                    key={ent.id}
+                    style={{
+                      marginBottom: 8,
+                      padding: "8px 10px",
+                      background: isLatestNote ? t.accentSoft : t.bg,
+                      borderRadius: 8,
+                      fontSize: 10,
+                      borderLeft: `3px solid ${
+                        ent.fields?.type === "cameras" ? t.orange : isLatestNote ? t.accent : t.border
+                      }`,
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 3 }}>
+                      {isLatestNote && (
+                        <span style={{ background: t.accent, color: "#fff", fontSize: 9, fontWeight: 700, borderRadius: 4, padding: "1px 5px" }}>
+                          LATEST
+                        </span>
+                      )}
+                      <span style={{ fontWeight: 700, color: t.text }}>
+                        {ent.fields?.type === "cameras" ? "📷 camera" : "📝 note"}
+                      </span>
+                      <span style={{ color: t.textSoft }}>{fmtDay(ent.reportDate)}</span>
+                      <span style={{ color: t.textSoft }}>{fmtTs(ent.recordedAt)}</span>
+                    </div>
+                    {ent.createdBy && (
+                      <div style={{ fontWeight: 700, color: t.accent, fontSize: 10, marginBottom: 2 }}>
+                        👤 {ent.createdBy}
+                      </div>
+                    )}
+                    <div style={{ color: t.text, lineHeight: 1.4 }}>{ent.manualNote || "—"}</div>
                   </div>
-                  <div style={{ marginTop: 4 }}>{ent.manualNote || "—"}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

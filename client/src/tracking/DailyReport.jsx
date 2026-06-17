@@ -1024,14 +1024,37 @@ export default function DailyReport({ readOnly = false }) {
                         </td>
                         <td
                           style={{
-                            padding: 8,
-                            maxWidth: 220,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
+                            padding: "6px 8px",
+                            maxWidth: 240,
+                            fontSize: 11,
                           }}
                         >
-                          {row.notes || row.autoNotes || "—"}
+                          {row.latestNote ? (
+                            <>
+                              <div
+                                style={{
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  maxWidth: 220,
+                                }}
+                                title={row.latestNote.text}
+                              >
+                                {row.latestNote.text}
+                              </div>
+                              <div style={{ fontSize: 9, color: "#6b7280", marginTop: 2, whiteSpace: "nowrap" }}>
+                                {row.latestNote.by ? `by ${row.latestNote.by}` : ""}
+                                {row.latestNote.by && row.latestNote.at ? " · " : ""}
+                                {row.latestNote.at ? fmtTs(row.latestNote.at) : ""}
+                              </div>
+                            </>
+                          ) : row.notes || row.autoNotes ? (
+                            <span style={{ color: "#6b7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", maxWidth: 220 }}>
+                              {row.notes || row.autoNotes}
+                            </span>
+                          ) : (
+                            <span style={{ color: "#9ca3af" }}>—</span>
+                          )}
                         </td>
                       </tr>
                     );

@@ -380,6 +380,14 @@ function enrichRowFromMeta(row, devIdno, reportDate) {
   row.notes = manual.notes != null ? manual.notes : row.notes || '';
   row.camerasEditedBy = manual.lastCameraEditedBy || null;
   row.camerasEditedAt = manual.lastCameraEditedAt || null;
+
+  // Latest manual note entry (for NOTES column in fleet table)
+  const latestNoteEntry = store.entries
+    .filter((e) => String(e.devIdno) === String(devIdno) && e.manualNote && e.fields?.type !== 'cameras')
+    .sort((a, b) => new Date(b.recordedAt) - new Date(a.recordedAt))[0] || null;
+  row.latestNote = latestNoteEntry
+    ? { text: latestNoteEntry.manualNote, by: latestNoteEntry.createdBy || null, at: latestNoteEntry.recordedAt }
+    : null;
   const camSum = cameraManual.toSummary(
     manual.cameraStatus || { camerasOk: manual.camerasOk, badChannels: manual.badChannels },
   );
