@@ -25,6 +25,85 @@ function fmtDay(iso) {
 
 const BUNDLE_WARN_DAYS = 5;
 
+/**
+ * FuelCell — shows current fuel level from live CMS data.
+ * If sensor is stale (reading not updating) while the vehicle is driving,
+ * we flag it as tampered / not working until fresh data appears.
+ */
+function FuelCell({ row }) {
+  const fd = row.fuelDisplay;
+  const gd = row.gprsDisplay;
+  const litres = fd?.litres;
+  const moving = gd?.moving === true;
+  // Sensor tamper: car is moving but fuel reading is stale (>2h old by default)
+  const sensorTampered = moving && fd?.stale;
+  const sensorError = fd?.status === "error";
+  const sensorWarn = fd?.status === "warn";
+  const hasReading = litres != null && litres > 0;
+
+  if (sensorTampered) {
+    // Car driving but fuel sensor not updating — show persistent alert
+    return (
+      <td
+        style={{
+          padding: "6px 8px",
+          fontSize: 11,
+          background: "#fee2e2",
+          border: "2px solid #ef4444",
+          borderRadius: 4,
+          whiteSpace: "nowrap",
+          minWidth: 80,
+        }}
+      >
+        <div style={{ fontWeight: 800, color: "#b91c1c", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
+          ⚠ Sensor alert
+        </div>
+        <div style={{ color: "#7f1d1d", fontSize: 10 }}>
+          {hasReading ? `Last: ${litres}L` : "No reading"}
+        </div>
+        <div style={{ color: "#991b1b", fontSize: 9 }}>
+          Frozen {fd?.ageLabel || "?"} · car moving
+        </div>
+      </td>
+    );
+  }
+
+  if (!hasReading && fd?.status === "none") {
+    return (
+      <td style={{ padding: "6px 8px", fontSize: 11, color: "#9ca3af" }}>—</td>
+    );
+  }
+
+  const bg = sensorError ? "#fecaca" : sensorWarn ? "#fef3c7" : undefined;
+  const color = sensorError ? "#7f1d1d" : sensorWarn ? "#78350f" : undefined;
+
+  return (
+    <td
+      style={{
+        padding: "6px 8px",
+        fontSize: 11,
+        background: bg,
+        color,
+        whiteSpace: "nowrap",
+        minWidth: 70,
+      }}
+    >
+      {hasReading ? (
+        <>
+          <div style={{ fontWeight: 700 }}>{litres}L</div>
+          {(sensorWarn || sensorError) && (
+            <div style={{ fontSize: 9, opacity: 0.85 }}>
+              {sensorError ? "⚠ stale " : "~"}{fd?.ageLabel || ""}
+            </div>
+          )}
+        </>
+      ) : (
+        <span style={{ color: "#9ca3af" }}>—</span>
+      )}
+    </td>
+  );
+}
+
 function mergeBundleOnRow(row, date, days) {
   const start = new Date(`${date}T12:00:00`);
   const end = new Date(start);
@@ -381,6 +460,7 @@ export default function DailyReport({ readOnly = false }) {
       "DRIVER PHONE",
       "DRIVER",
       "BUNDLE",
+      "FUEL",
       "CAM",
       "GPRS",
       "ANTENNA",
@@ -388,8 +468,14 @@ export default function DailyReport({ readOnly = false }) {
     ];
     const lines = [
       header.join(","),
-      ...rows.map((r) =>
-        [
+      ...rows.map((r) => {
+        const fd = r.fuelDisplay;
+        const moving = r.gprsDisplay?.moving === true;
+        const fuelTampered = moving && fd?.stale;
+        const fuelStr = fuelTampered
+          ? `SENSOR ALERT (${fd?.litres != null ? fd.litres + "L frozen" : "no reading"})`
+          : fd?.litres != null ? `${fd.litres}L` : "";
+        return [
           r.no ?? "",
           esc(r.plate),
           r.devIdno ?? "",
@@ -399,12 +485,13 @@ export default function DailyReport({ readOnly = false }) {
           r.bundleDaysLeft != null
             ? `${r.bundleDaysLeft}d left`
             : r.bundlePurchasedDate ?? "",
+          fuelStr,
           r.camerasOk === true ? "OK" : r.camerasOk === false ? "ISSUE" : "",
           r.gprsDisplay?.label || r.gprsOk === true ? "OK" : r.gprsOk === false ? "ISSUE" : "",
           r.antennaOk === true ? "OK" : r.antennaOk === false ? "ISSUE" : "",
           esc(r.notes || r.autoNotes),
-        ].join(","),
-      ),
+        ].join(",");
+      }),
     ];
     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
@@ -795,6 +882,7 @@ export default function DailyReport({ readOnly = false }) {
                       "SIM",
                       "DRIVER",
                       "BUNDLE",
+                      "FUEL",
                       "CAM",
                       "GPRS",
                       "ANTENNA",
@@ -923,6 +1011,8 @@ export default function DailyReport({ readOnly = false }) {
                             "—"
                           )}
                         </td>
+                        {/* ── FUEL cell ── */}
+                        <FuelCell row={row} />
                         <td style={{ padding: 8 }}>
                           <CamCellLabel row={row} t={t} />
                         </td>

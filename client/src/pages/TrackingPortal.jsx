@@ -9,6 +9,8 @@ const tabClass = ({ isActive }) =>
     isActive ? "border-brand-600 text-brand-700" : "border-transparent text-gray-500 hover:text-gray-800"
   }`;
 
+const MAX_RANGE_DAYS = 7;
+
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -19,6 +21,53 @@ function defaultFromTs(date) {
 
 function defaultToTs(date) {
   return `${date || todayStr()}T23:59`;
+}
+
+/** Returns null if valid, or an error string if range > MAX_RANGE_DAYS */
+function validateDateRange(from, to) {
+  if (!from || !to) return null;
+  const diff = (new Date(to) - new Date(from)) / 86400000;
+  if (diff < 0) return "\"From\" date must be before \"To\" date.";
+  if (diff > MAX_RANGE_DAYS) return `Date range cannot exceed ${MAX_RANGE_DAYS} days. Please narrow the range.`;
+  return null;
+}
+
+/** Hook: loads vehicle plate list for autocomplete */
+function useVehiclePlates() {
+  const [plates, setPlates] = useState([]);
+  useEffect(() => {
+    import("../tracking/api.js").then(({ apiFetch }) => {
+      apiFetch("/vehicles").then((list) => {
+        if (Array.isArray(list)) {
+          // list is the data array from { success, data: [...] } unwrapped by apiFetch
+          const arr = Array.isArray(list) ? list : (list?.data || []);
+          setPlates(arr.map((v) => v.plate).filter(Boolean).sort());
+        }
+      }).catch(() => {});
+    });
+  }, []);
+  return plates;
+}
+
+/** Plate input with autocomplete dropdown */
+function PlateAutocomplete({ value, onChange, placeholder = "All vehicles", id = "plate-ac" }) {
+  const plates = useVehiclePlates();
+  const listId = `${id}-list`;
+  return (
+    <div className="relative">
+      <input
+        className="input"
+        list={listId}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        autoComplete="off"
+      />
+      <datalist id={listId}>
+        {plates.map((p) => <option key={p} value={p} />)}
+      </datalist>
+    </div>
+  );
 }
 
 function Placeholder({ title, children }) {
@@ -248,6 +297,8 @@ export function TrackingFuelAlerts() {
     setToTs((prev) => `${to}T${prev.split("T")[1] || "23:59"}`);
   }, [to]);
 
+  const rangeError = validateDateRange(from, to);
+
   const saveThreshold = async (val) => {
     const { apiFetch } = await import("../tracking/api.js");
     await apiFetch("/settings", { method: "PATCH", body: { defaultDropThresholdL: val } });
@@ -255,6 +306,9 @@ export function TrackingFuelAlerts() {
 
   const run = async () => {
     if (!canRun) return;
+    const re = validateDateRange(from, to);
+    if (re) { setError(re); return; }
+    if (!threshold || threshold < 1) { setError("Drop threshold must be at least 1L."); return; }
     setLoading(true);
     setError("");
     try {
@@ -276,7 +330,8 @@ export function TrackingFuelAlerts() {
     <Placeholder title="Fuel drops & theft analysis">
       <p className="text-sm text-gray-600 mb-4">
         Query GPS + fuel history from CMS. Each alert shows <strong>Point A → Point B</strong> with distance, time, and Google Maps route.
-        Uses your <strong>drop threshold (L)</strong> — only drops at or above this value are shown (includes stale-sensor cases).
+        Set your <strong>drop threshold (L)</strong> — only drops <em>at or above</em> this value are reported (includes stale-sensor tamper cases).
+        Maximum date range: <strong>{MAX_RANGE_DAYS} days</strong>.
       </p>
       <div className="card p-4 mb-4 grid md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
         <div>
@@ -296,15 +351,29 @@ export function TrackingFuelAlerts() {
           <input type="time" className="input" value={toTs.split("T")[1] || "23:59"} onChange={(e) => setToTs(`${to}T${e.target.value}`)} />
         </div>
         <div>
-          <label className="label">Vehicle plate (optional)</label>
-          <input className="input" value={plate} onChange={(e) => setPlate(e.target.value)} placeholder="All vehicles" />
+          <label className="label">Vehicle plate (type to filter)</label>
+          <PlateAutocomplete id="fuel-plate" value={plate} onChange={(e) => setPlate(e.target.value)} placeholder="All vehicles" />
         </div>
         <div>
-          <label className="label">Drop threshold (L)</label>
-          <input type="number" min={1} step={1} className="input" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} />
+          <label className="label font-semibold text-gray-800">Drop threshold (L) <span className="text-red-500">*</span></label>
+          <input
+            type="number" min={1} step={1} required
+            className={`input ${!threshold || threshold < 1 ? "border-red-400 ring-1 ring-red-400" : "border-brand-400 ring-1 ring-brand-300"}`}
+            value={threshold}
+            onChange={(e) => setThreshold(Number(e.target.value))}
+          />
+          <p className="text-[11px] text-gray-500 mt-1">Fuel drops ≥ this value will be reported</p>
         </div>
-        <button type="button" className="btn btn-primary md:col-span-3 lg:col-span-6" onClick={run} disabled={loading || !canRun}>
-          {loading ? "Querying CMS GPS + fuel…" : canRun ? "Run analysis" : "View only — cannot run analysis"}
+        {rangeError && (
+          <div className="md:col-span-3 lg:col-span-6 text-red-600 text-sm font-medium">{rangeError}</div>
+        )}
+        <button
+          type="button"
+          className="btn btn-primary md:col-span-3 lg:col-span-6"
+          onClick={run}
+          disabled={loading || !canRun || !!rangeError}
+        >
+          {loading ? "Querying CMS GPS + fuel…" : canRun ? `Run analysis (threshold: ${threshold}L)` : "View only — cannot run analysis"}
         </button>
       </div>
       {appliedThreshold != null && (
@@ -329,6 +398,7 @@ export function TrackingNotifications() {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState("");
   const [backfillNote, setBackfillNote] = useState("");
+  const [rangeErr, setRangeErr] = useState("");
 
   useEffect(() => {
     setFromTs((prev) => `${from}T${prev.split("T")[1] || "00:00"}`);
@@ -338,7 +408,14 @@ export function TrackingNotifications() {
     setToTs((prev) => `${to}T${prev.split("T")[1] || "23:59"}`);
   }, [to]);
 
+  // Live range validation
+  useEffect(() => {
+    setRangeErr(validateDateRange(from, to) || "");
+  }, [from, to]);
+
   const load = useCallback(async () => {
+    const re = validateDateRange(from, to);
+    if (re) { setRangeErr(re); return; }
     setLoading(true);
     setBackfillNote("");
     try {
@@ -369,12 +446,15 @@ export function TrackingNotifications() {
 
   useEffect(() => {
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <Placeholder title="Serious fuel theft notifications">
       <p className="text-sm text-gray-600 mb-4">
         Auto-saved alerts for fuel drops <strong>≥ 10L</strong> (theft suspicion). Past dates are loaded from CMS on first request, then kept in history.
+        The background scanner runs continuously — <strong>alerts accumulate even when you are not logged in</strong>.
+        Maximum date range: <strong>{MAX_RANGE_DAYS} days</strong>.
       </p>
       <div className="card p-4 mb-4 grid md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
         <div>
@@ -394,12 +474,15 @@ export function TrackingNotifications() {
           <input type="time" className="input" value={toTs.split("T")[1] || "23:59"} onChange={(e) => setToTs(`${to}T${e.target.value}`)} />
         </div>
         <div>
-          <label className="label">Plate (optional)</label>
-          <input className="input" value={plate} onChange={(e) => setPlate(e.target.value)} placeholder="All vehicles" />
+          <label className="label">Plate (type to filter)</label>
+          <PlateAutocomplete id="notif-plate" value={plate} onChange={(e) => setPlate(e.target.value)} placeholder="All vehicles" />
         </div>
-        <button type="button" className="btn btn-primary" onClick={load} disabled={loading}>
+        <button type="button" className="btn btn-primary" onClick={load} disabled={loading || !!rangeErr}>
           {loading ? "Querying CMS…" : "Load alerts"}
         </button>
+        {rangeErr && (
+          <div className="md:col-span-3 lg:col-span-6 text-red-600 text-sm font-medium">{rangeErr}</div>
+        )}
       </div>
       {loading && <p className="text-sm text-indigo-700 mb-3">Loading alerts — historical ranges may query CMS for each vehicle (this can take several minutes).</p>}
       {backfillNote && !loading && <p className="text-sm text-gray-600 mb-3">{backfillNote}</p>}
