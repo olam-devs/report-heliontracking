@@ -20,27 +20,31 @@ const isImage = (mime) => mime?.startsWith('image/');
 // ── Status pill ──────────────────────────────────────────────────────────────
 function StatusRow({ status }) {
   if (!status) return <div className="text-xs text-gray-400 italic">Status unavailable</div>;
-  const online = status.helionStatus === 'connected' || status.online;
-  const acc = status.acc || status.gprsDisplay?.acc;
-  const fuel = status.fuelDisplay?.litres ?? status.fuel;
-  const speed = status.gprsDisplay?.speed ?? status.speed;
+  const online = status.online === 1 || status.online === true;
+  const acc = status.accOn;
+  const fuel = status.fuel;
+  const lat = status.lat;
+  const lng = status.lng;
+  const hasLocation = lat != null && lng != null && (lat !== 0 || lng !== 0);
+  const mapsUrl = hasLocation ? `https://maps.google.com/?q=${lat},${lng}` : null;
   return (
     <div className="flex flex-wrap gap-2 text-xs">
-      <span className={`px-2 py-0.5 rounded-full font-semibold ${online ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+      <span className={`px-2 py-1 rounded-full font-semibold ${online ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
         {online ? '● Online' : '○ Offline'}
       </span>
-      <span className={`px-2 py-0.5 rounded-full font-semibold ${acc ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+      <span className={`px-2 py-1 rounded-full font-semibold ${acc ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
         ACC {acc ? 'ON' : 'OFF'}
       </span>
       {fuel != null && (
-        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold">
+        <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">
           ⛽ {Math.round(fuel)}L
         </span>
       )}
-      {speed != null && (
-        <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-semibold">
-          {Math.round(speed)} km/h
-        </span>
+      {mapsUrl && (
+        <a href={mapsUrl} target="_blank" rel="noreferrer"
+          className="px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 font-semibold flex items-center gap-1">
+          📍 View location
+        </a>
       )}
     </div>
   );
@@ -172,15 +176,25 @@ function MechanicView() {
     if (!selected) { setStatus(null); setAdminNotes([]); setLogs([]); return; }
     const grant = grants.find(g => g.devIdno === selected);
 
+    const fetchStatus = () => {
+      if (!grant?.can_see_status) return;
+      api.get(`/mechanic/vehicle-status/${selected}`)
+        .then(r => { setStatus(r.data.data); setLoadingStatus(false); })
+        .catch(() => setLoadingStatus(false));
+    };
+
     if (grant?.can_see_status) {
       setLoadingStatus(true);
-      api.get(`/mechanic/vehicle-status/${selected}`).then(r => setStatus(r.data.data)).catch(() => {}).finally(() => setLoadingStatus(false));
+      fetchStatus();
+      const interval = setInterval(fetchStatus, 5000);
+      api.get(`/mechanic/admin-notes/${selected}`).then(r => setAdminNotes(r.data.data || [])).catch(() => {});
+      loadLogs();
+      return () => clearInterval(interval);
     } else {
       setStatus(null);
+      api.get(`/mechanic/admin-notes/${selected}`).then(r => setAdminNotes(r.data.data || [])).catch(() => {});
+      loadLogs();
     }
-
-    api.get(`/mechanic/admin-notes/${selected}`).then(r => setAdminNotes(r.data.data || [])).catch(() => {});
-    loadLogs();
   }, [selected]);
 
   const loadLogs = async () => {
