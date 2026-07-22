@@ -277,6 +277,68 @@ function MechanicView() {
   );
 }
 
+// ── Searchable vehicle picker ─────────────────────────────────────────────────
+function VehicleSearch({ vehicles, value, onChange, placeholder = 'Search vehicle plate…' }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+
+  const selected = vehicles.find(v => v.devIdno === value);
+  const filtered = query
+    ? vehicles.filter(v => v.plate?.toLowerCase().includes(query.toLowerCase()))
+    : vehicles;
+
+  useEffect(() => {
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  const select = (v) => { onChange(v.devIdno); setQuery(''); setOpen(false); };
+  const clear = () => { onChange(''); setQuery(''); };
+
+  return (
+    <div className="relative" ref={ref}>
+      <div className="input flex items-center gap-2 cursor-pointer" onClick={() => setOpen(o => !o)}>
+        {selected ? (
+          <>
+            <span className="flex-1 text-sm font-medium">{selected.plate}</span>
+            <button type="button" onClick={e => { e.stopPropagation(); clear(); }} className="text-gray-400 hover:text-gray-600 text-xs">✕</button>
+          </>
+        ) : (
+          <span className="flex-1 text-sm text-gray-400">{placeholder}</span>
+        )}
+        <span className="text-gray-400 text-xs">▼</span>
+      </div>
+      {open && (
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-gray-100">
+            <input
+              autoFocus
+              className="input text-sm py-1.5 w-full"
+              placeholder="Type to filter…"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="p-3 text-sm text-gray-400 text-center">No vehicles found</div>
+            ) : filtered.map(v => (
+              <button key={v.devIdno} type="button"
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-brand-50 hover:text-brand-700 transition-colors ${v.devIdno === value ? 'bg-brand-50 text-brand-700 font-semibold' : ''}`}
+                onClick={() => select(v)}>
+                {v.plate}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Admin mechanic panel ──────────────────────────────────────────────────────
 function AdminView() {
   const [tab, setTab] = useState('access');
@@ -402,10 +464,7 @@ function AdminView() {
               </div>
               <div>
                 <label className="label">Vehicle</label>
-                <select className="input" value={grantVehicle} onChange={e => setGrantVehicle(e.target.value)}>
-                  <option value="">Select vehicle…</option>
-                  {vehicles.map(v => <option key={v.devIdno} value={v.devIdno}>{v.plate}</option>)}
-                </select>
+                <VehicleSearch vehicles={vehicles} value={grantVehicle} onChange={setGrantVehicle} />
               </div>
               <div className="flex flex-col justify-end pb-0.5">
                 <label className="flex items-center gap-2 cursor-pointer text-sm">
@@ -507,14 +566,9 @@ function AdminView() {
           {/* Add note form */}
           <div className="card p-5 space-y-3">
             <h2 className="text-sm font-bold text-gray-700">Leave a note for mechanics on a vehicle</h2>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="label">Vehicle</label>
-                <select className="input" value={noteVehicle} onChange={e => setNoteVehicle(e.target.value)}>
-                  <option value="">Select vehicle…</option>
-                  {vehicles.map(v => <option key={v.devIdno} value={v.devIdno}>{v.plate}</option>)}
-                </select>
-              </div>
+            <div>
+              <label className="label">Vehicle</label>
+              <VehicleSearch vehicles={vehicles} value={noteVehicle} onChange={setNoteVehicle} />
             </div>
             <textarea value={noteText} onChange={e => setNoteText(e.target.value)} rows={3}
               placeholder="Note for the mechanic assigned to this vehicle…"

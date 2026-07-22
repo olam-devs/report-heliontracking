@@ -41,8 +41,9 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const isAdmin = user?.role === 'admin';
+  const isMechanic = user?.role === 'mechanic';
   const canTrack = isAdmin || user?.can_view_tracking;
-  const canMechanic = isAdmin || user?.role === 'mechanic';
+  const canMechanic = isAdmin || isMechanic;
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebar_collapsed') === '1'; } catch { return false; }
   });
@@ -131,8 +132,8 @@ export default function Layout() {
 
         {/* Nav */}
         <nav className="flex-1 p-2 space-y-0.5">
-          <NavItem to="/drivers"  icon={ICONS.drivers}  label="Drivers"    collapsed={collapsed} />
-          <NavItem to="/cases"    icon={ICONS.cases}    label="All Cases"  collapsed={collapsed} />
+          {!isMechanic && <NavItem to="/drivers"  icon={ICONS.drivers}  label="Drivers"    collapsed={collapsed} />}
+          {!isMechanic && <NavItem to="/cases"    icon={ICONS.cases}    label="All Cases"  collapsed={collapsed} />}
           {canTrack && (
             <NavItem to="/tracking" icon={ICONS.tracking} label="Fleet Tracking" collapsed={collapsed} badge={unreadNotifs} />
           )}
