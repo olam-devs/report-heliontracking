@@ -88,6 +88,29 @@ export default function Layout() {
     toast.success('Logged out');
   };
 
+  if (isMechanic) {
+    return (
+      <div className="min-h-screen flex flex-col bg-gray-50">
+        <header className="bg-brand-900 text-white px-4 py-3 flex items-center justify-between shrink-0 sticky top-0 z-10 shadow">
+          <div className="flex items-center gap-2">
+            <img src="/logo.svg" alt="" style={{ height: '28px', width: 'auto', filter: 'brightness(0) invert(1)' }} />
+            <span className="text-sm font-semibold text-white/80">Mechanic Portal</span>
+          </div>
+          <button onClick={handleLogout}
+            className="flex items-center gap-1.5 text-sm text-white/70 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.logout} />
+            </svg>
+            Logout
+          </button>
+        </header>
+        <main className="flex-1 overflow-auto">
+          <Outlet />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex overflow-hidden">
       {/* Sidebar */}

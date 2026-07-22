@@ -210,10 +210,9 @@ function MechanicView() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Mobile header */}
-      <div className="bg-brand-900 text-white px-4 py-4 sticky top-0 z-10 shadow">
-        <h1 className="text-base font-bold">My Worklog</h1>
-        <p className="text-xs text-white/60 mt-0.5">{fmtDate(today)}</p>
+      <div className="px-4 pt-4 pb-1">
+        <h1 className="text-base font-bold text-gray-800">My Worklog</h1>
+        <p className="text-xs text-gray-400">{fmtDate(today)}</p>
       </div>
 
       <div className="p-4 space-y-4 max-w-lg mx-auto">
