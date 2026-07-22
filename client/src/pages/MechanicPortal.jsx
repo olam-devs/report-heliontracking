@@ -20,7 +20,7 @@ const isImage = (mime) => mime?.startsWith('image/');
 // ── Status pill ──────────────────────────────────────────────────────────────
 function StatusRow({ status }) {
   if (!status) return <div className="text-xs text-gray-400 italic">Status unavailable</div>;
-  const online = status.online === 1 || status.online === true;
+  const online = (status.ol ?? status.online ?? 0) !== 0;
   const acc = status.accOn;
   const fuel = status.fuel;
   const lat = status.lat;
