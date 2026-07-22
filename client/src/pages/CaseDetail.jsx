@@ -434,7 +434,7 @@ export default function CaseDetail() {
       setMeta({
         title: c.title,
         vehicle_plate: c.vehicle_plate || '',
-        incident_date: c.incident_date ? c.incident_date.split('T')[0] : '',
+        incident_date: c.incident_date ? (c.incident_date instanceof Date ? c.incident_date.toISOString() : String(c.incident_date)).split('T')[0] : '',
         status: c.status,
         severity: c.severity,
       });

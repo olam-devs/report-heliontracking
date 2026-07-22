@@ -40,6 +40,7 @@ app.use('/api/report-templates', require('./src/routes/reportTemplates'));
 app.use('/api/roles',           require('./src/routes/customRoles'));
 app.use('/api/cases/:caseId/report', require('./src/routes/caseReports'));
 app.use('/api/tracking', require('./src/routes/tracking'));
+app.use('/api/mechanic', require('./src/routes/mechanic'));
 
 const { startNotificationScanner } = require('./src/tracking/notification-scanner.service');
 const dailyLog = require('./src/tracking/lib/services/daily-log.service');

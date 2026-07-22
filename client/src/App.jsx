@@ -10,6 +10,7 @@ import Users from './pages/Users';
 import ReportEditor from './pages/ReportEditor';
 import ReportTemplates from './pages/ReportTemplates';
 import Layout from './components/Layout';
+import MechanicPortal from './pages/MechanicPortal';
 import TrackingPortal, {
   TrackingDailyReport,
   TrackingFuelAlerts,
@@ -29,6 +30,12 @@ function TrackingRoute({ children }) {
   return can ? children : <Navigate to="/drivers" replace />;
 }
 
+function MechanicRoute({ children }) {
+  const { user } = useAuth();
+  const can = user?.role === 'admin' || user?.role === 'mechanic';
+  return can ? children : <Navigate to="/drivers" replace />;
+}
+
 function AppRoutes() {
   const { isAuthenticated } = useAuth();
   return (
@@ -45,6 +52,7 @@ function AppRoutes() {
         <Route path="cases/:id/preview" element={<ExportPreview />} />
 <Route path="report-templates" element={<ReportTemplates />} />
         <Route path="users" element={<Users />} />
+        <Route path="mechanic" element={<MechanicRoute><MechanicPortal /></MechanicRoute>} />
         <Route path="tracking" element={<ProtectedRoute><TrackingRoute><TrackingPortal /></TrackingRoute></ProtectedRoute>}>
           <Route index element={<TrackingDailyReport />} />
           <Route path="fuel-alerts" element={<TrackingFuelAlerts />} />
