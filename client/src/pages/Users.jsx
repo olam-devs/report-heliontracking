@@ -168,6 +168,7 @@ function UserModal({ user, drivers, cases, roles, onClose, onSave }) {
   };
 
   const isAdmin = form.role === 'admin';
+  const isMechanic = form.role === 'mechanic';
   const Tab = ({ id, label }) => (
     <button
       type="button"
@@ -189,8 +190,8 @@ function UserModal({ user, drivers, cases, roles, onClose, onSave }) {
         {/* Tabs */}
         <div className="flex border-b border-gray-200 px-6 shrink-0">
           <Tab id="info"    label="Profile" />
-          <Tab id="perms"   label="Permissions" />
-          <Tab id="access"  label="Data Access" />
+          {!isMechanic && <Tab id="perms"   label="Permissions" />}
+          {!isMechanic && <Tab id="access"  label="Data Access" />}
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
