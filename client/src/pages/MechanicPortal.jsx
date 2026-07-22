@@ -50,34 +50,33 @@ function StatusRow({ status }) {
 function LogCard({ log, isToday }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
-      <div className="px-4 py-3 flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            {isToday && <span className="text-[10px] font-bold bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full uppercase tracking-wide">Today</span>}
-            <span className="text-xs text-gray-400">{fmtTs(log.recorded_at)}</span>
-            {log.mechanic_name && <span className="text-xs text-gray-500">by {log.mechanic_name}</span>}
-          </div>
-          <p className="text-sm text-gray-800 whitespace-pre-wrap">{log.note}</p>
+    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <div className="px-4 py-3">
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          {isToday && <span className="text-[10px] font-bold bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full uppercase tracking-wide">Today</span>}
+          <span className="text-xs text-gray-400">{fmtTs(log.recorded_at)}</span>
+          {log.mechanic_name && <span className="text-xs text-gray-500">by {log.mechanic_name}</span>}
         </div>
+        <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{log.note}</p>
         {log.attachments?.length > 0 && (
-          <button onClick={() => setOpen(o => !o)} className="shrink-0 text-xs text-brand-600 hover:underline">
-            {log.attachments.length} file{log.attachments.length !== 1 ? 's' : ''} {open ? '▲' : '▼'}
+          <button onClick={() => setOpen(o => !o)}
+            className="mt-2 text-xs text-brand-600 font-medium flex items-center gap-1">
+            📎 {log.attachments.length} file{log.attachments.length !== 1 ? 's' : ''} {open ? '▲' : '▼'}
           </button>
         )}
       </div>
       {open && log.attachments?.length > 0 && (
-        <div className="border-t border-gray-100 px-4 py-3 flex flex-wrap gap-3">
+        <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-3 gap-2">
           {log.attachments.map(a => (
             <a key={a.id} href={`/uploads/mechanic/${log.id}/${a.filename}`} target="_blank" rel="noreferrer"
-              className="group flex flex-col items-center gap-1">
+              className="flex flex-col items-center gap-1">
               {isImage(a.mime_type) ? (
                 <img src={`/uploads/mechanic/${log.id}/${a.filename}`} alt={a.original_name}
-                  className="w-20 h-20 object-cover rounded-lg border border-gray-200 group-hover:opacity-80 transition-opacity" />
+                  className="w-full aspect-square object-cover rounded-xl border border-gray-200" />
               ) : (
-                <div className="w-20 h-20 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-2xl">📄</div>
+                <div className="w-full aspect-square flex items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-3xl">📄</div>
               )}
-              <span className="text-[10px] text-gray-500 text-center max-w-[80px] truncate">{a.original_name}</span>
+              <span className="text-[10px] text-gray-500 text-center w-full truncate">{a.original_name}</span>
             </a>
           ))}
         </div>
@@ -116,39 +115,38 @@ function AddLogForm({ devIdno, plate, onAdded }) {
   };
 
   return (
-    <div className="card p-4 space-y-3">
+    <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
       <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Add work log — {plate}</h3>
       <textarea
         value={note} onChange={e => setNote(e.target.value)}
-        rows={3} placeholder="Describe the work done on this vehicle…"
-        className="input w-full resize-none text-sm"
+        rows={4} placeholder="Describe the work done on this vehicle…"
+        className="input w-full resize-none text-base leading-relaxed"
+        style={{ fontSize: '16px' }}
       />
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => fileRef.current?.click()}
-            className="text-xs border border-dashed border-gray-300 hover:border-brand-400 text-gray-500 hover:text-brand-600 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
-            📎 {files.length ? `${files.length} file${files.length > 1 ? 's' : ''}` : 'Attach photos'}
-          </button>
-          {files.length > 0 && (
-            <button onClick={() => setFiles([])} className="text-xs text-red-400 hover:text-red-600">✕ clear</button>
-          )}
-          <input ref={fileRef} type="file" multiple accept="image/*,video/*,.pdf"
-            className="hidden" onChange={e => setFiles(Array.from(e.target.files))} />
-        </div>
-        <button onClick={submit} disabled={saving || !note.trim()}
-          className="btn btn-primary text-sm py-1.5 px-4">
-          {saving ? 'Saving…' : 'Save log'}
-        </button>
-      </div>
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {files.map((f, i) => (
-            <div key={i} className="flex items-center gap-1 text-xs bg-gray-100 rounded px-2 py-1">
+            <div key={i} className="flex items-center gap-1 text-xs bg-gray-100 rounded-lg px-2 py-1.5">
               {f.type.startsWith('image/') ? '🖼' : '📄'} <span className="max-w-[120px] truncate">{f.name}</span>
             </div>
           ))}
         </div>
       )}
+      <div className="flex gap-2">
+        <button type="button" onClick={() => fileRef.current?.click()}
+          className="flex-1 border-2 border-dashed border-gray-300 text-gray-500 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 active:bg-gray-50">
+          📎 {files.length ? `${files.length} file${files.length > 1 ? 's' : ''}` : 'Attach photos'}
+        </button>
+        {files.length > 0 && (
+          <button onClick={() => setFiles([])} className="px-3 text-red-400 text-sm border border-red-200 rounded-xl">✕</button>
+        )}
+        <input ref={fileRef} type="file" multiple accept="image/*,video/*,.pdf"
+          className="hidden" onChange={e => setFiles(Array.from(e.target.files))} />
+        <button onClick={submit} disabled={saving || !note.trim()}
+          className="flex-1 btn btn-primary py-2.5 text-sm font-bold rounded-xl disabled:opacity-40">
+          {saving ? 'Saving…' : '✓ Save log'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -197,82 +195,87 @@ function MechanicView() {
   const grant = grants.find(g => g.devIdno === selected);
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">My Worklog</h1>
-        <p className="text-sm text-gray-500">{fmtDate(today)} — select a vehicle to log work</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile header */}
+      <div className="bg-brand-900 text-white px-4 py-4 sticky top-0 z-10 shadow">
+        <h1 className="text-base font-bold">My Worklog</h1>
+        <p className="text-xs text-white/60 mt-0.5">{fmtDate(today)}</p>
       </div>
 
-      {/* Vehicle selector */}
-      {grants.length === 0 ? (
-        <div className="card p-8 text-center text-gray-400">
-          <div className="text-4xl mb-3">🔧</div>
-          <p className="font-medium text-gray-600">No vehicles assigned today</p>
-          <p className="text-sm mt-1">Your supervisor will grant you access to vehicles for today.</p>
-        </div>
-      ) : (
-        <div>
-          <label className="label">Select vehicle</label>
-          <div className="flex flex-wrap gap-2">
-            {grants.map(g => (
-              <button key={g.id} onClick={() => setSelected(selected === g.devIdno ? null : g.devIdno)}
-                className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-all ${
-                  selected === g.devIdno
-                    ? 'bg-brand-600 text-white border-brand-600 shadow'
-                    : 'bg-white text-gray-700 border-gray-200 hover:border-brand-300'
-                }`}>
-                {g.plate}
-                {g.can_see_status && <span className="ml-1.5 text-[10px] opacity-70">📊</span>}
-              </button>
-            ))}
+      <div className="p-4 space-y-4 max-w-lg mx-auto">
+        {/* Vehicle selector */}
+        {grants.length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 text-center shadow-sm mt-4">
+            <div className="text-5xl mb-3">🔧</div>
+            <p className="font-semibold text-gray-700">No vehicles assigned today</p>
+            <p className="text-sm text-gray-400 mt-1">Your supervisor will grant you access to vehicles for today.</p>
           </div>
-        </div>
-      )}
-
-      {selected && grant && (
-        <>
-          {/* Live status */}
-          {grant.can_see_status && (
-            <div className="card p-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Live status — {grant.plate}</h3>
-              {loadingStatus ? <span className="text-xs text-gray-400">Loading…</span> : <StatusRow status={status} />}
-            </div>
-          )}
-
-          {/* Admin notes */}
-          {adminNotes.length > 0 && (
-            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-2">
-              <div className="text-xs font-bold uppercase tracking-wider text-amber-700">📋 Notes from supervisor</div>
-              {adminNotes.map(n => (
-                <div key={n.id} className="text-sm text-amber-900">
-                  <span className="font-medium">{n.created_by_name}</span>
-                  <span className="text-amber-600 text-xs ml-2">{fmtTs(n.created_at)}</span>
-                  <p className="mt-0.5 whitespace-pre-wrap">{n.note}</p>
-                </div>
+        ) : (
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Select vehicle</p>
+            <div className="grid grid-cols-2 gap-2">
+              {grants.map(g => (
+                <button key={g.id} onClick={() => setSelected(selected === g.devIdno ? null : g.devIdno)}
+                  className={`py-3 px-3 rounded-xl border-2 text-sm font-bold transition-all active:scale-95 ${
+                    selected === g.devIdno
+                      ? 'bg-brand-600 text-white border-brand-600 shadow-md'
+                      : 'bg-white text-gray-700 border-gray-200'
+                  }`}>
+                  {g.plate}
+                  {g.can_see_status && <div className="text-[10px] mt-0.5 opacity-70">📊 Status</div>}
+                </button>
               ))}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Add log */}
-          <AddLogForm devIdno={selected} plate={grant.plate} onAdded={loadLogs} />
-
-          {/* History */}
-          <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
-              History — {grant.plate} ({logs.length} entr{logs.length === 1 ? 'y' : 'ies'})
-            </h3>
-            {logsLoading ? (
-              <div className="text-sm text-gray-400 p-4 text-center">Loading…</div>
-            ) : logs.length === 0 ? (
-              <div className="text-sm text-gray-400 p-4 text-center card">No logs yet for this vehicle.</div>
-            ) : (
-              <div className="space-y-3">
-                {logs.map(l => <LogCard key={l.id} log={l} isToday={String(l.log_date).slice(0,10) === today} />)}
+        {selected && grant && (
+          <>
+            {/* Live status */}
+            {grant.can_see_status && (
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Live status — {grant.plate}</p>
+                {loadingStatus ? <span className="text-xs text-gray-400">Loading…</span> : <StatusRow status={status} />}
               </div>
             )}
-          </div>
-        </>
-      )}
+
+            {/* Admin notes */}
+            {adminNotes.length > 0 && (
+              <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3">
+                <div className="text-xs font-bold uppercase tracking-wider text-amber-700">📋 Notes from supervisor</div>
+                {adminNotes.map(n => (
+                  <div key={n.id} className="text-sm text-amber-900 bg-white/60 rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold">{n.created_by_name}</span>
+                      <span className="text-amber-600 text-xs">{fmtTs(n.created_at)}</span>
+                    </div>
+                    <p className="whitespace-pre-wrap leading-relaxed">{n.note}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add log */}
+            <AddLogForm devIdno={selected} plate={grant.plate} onAdded={loadLogs} />
+
+            {/* History */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 px-1">
+                History — {grant.plate} ({logs.length} entr{logs.length === 1 ? 'y' : 'ies'})
+              </p>
+              {logsLoading ? (
+                <div className="text-sm text-gray-400 py-8 text-center">Loading…</div>
+              ) : logs.length === 0 ? (
+                <div className="bg-white rounded-2xl p-8 text-center text-sm text-gray-400 shadow-sm">No logs yet for this vehicle.</div>
+              ) : (
+                <div className="space-y-3">
+                  {logs.map(l => <LogCard key={l.id} log={l} isToday={String(l.log_date).slice(0,10) === today} />)}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

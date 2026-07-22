@@ -36,22 +36,32 @@ function MechanicRoute({ children }) {
   return can ? children : <Navigate to="/drivers" replace />;
 }
 
+function DefaultRedirect() {
+  const { user } = useAuth();
+  return <Navigate to={user?.role === 'mechanic' ? '/mechanic' : '/drivers'} replace />;
+}
+
+function NonMechanicRoute({ children }) {
+  const { user } = useAuth();
+  return user?.role === 'mechanic' ? <Navigate to="/mechanic" replace /> : children;
+}
+
 function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   return (
     <Routes>
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/drivers" replace /> : <Login />} />
+      <Route path="/login" element={isAuthenticated ? <DefaultRedirect /> : <Login />} />
       {/* Full-screen report editor (no sidebar) */}
       <Route path="/cases/:id/report" element={<ProtectedRoute><ReportEditor /></ProtectedRoute>} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-        <Route index element={<Navigate to="/drivers" replace />} />
-        <Route path="drivers" element={<DriversList />} />
-        <Route path="drivers/:id" element={<DriverDetail />} />
-        <Route path="cases" element={<CasesList />} />
-        <Route path="cases/:id" element={<CaseDetail />} />
-        <Route path="cases/:id/preview" element={<ExportPreview />} />
-<Route path="report-templates" element={<ReportTemplates />} />
-        <Route path="users" element={<Users />} />
+        <Route index element={<DefaultRedirect />} />
+        <Route path="drivers" element={<NonMechanicRoute><DriversList /></NonMechanicRoute>} />
+        <Route path="drivers/:id" element={<NonMechanicRoute><DriverDetail /></NonMechanicRoute>} />
+        <Route path="cases" element={<NonMechanicRoute><CasesList /></NonMechanicRoute>} />
+        <Route path="cases/:id" element={<NonMechanicRoute><CaseDetail /></NonMechanicRoute>} />
+        <Route path="cases/:id/preview" element={<NonMechanicRoute><ExportPreview /></NonMechanicRoute>} />
+        <Route path="report-templates" element={<NonMechanicRoute><ReportTemplates /></NonMechanicRoute>} />
+        <Route path="users" element={<NonMechanicRoute><Users /></NonMechanicRoute>} />
         <Route path="mechanic" element={<MechanicRoute><MechanicPortal /></MechanicRoute>} />
         <Route path="tracking" element={<ProtectedRoute><TrackingRoute><TrackingPortal /></TrackingRoute></ProtectedRoute>}>
           <Route index element={<TrackingDailyReport />} />
@@ -61,7 +71,7 @@ function AppRoutes() {
           <Route path="danger-zones" element={<TrackingDangerZones />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/drivers" replace />} />
+      <Route path="*" element={<DefaultRedirect />} />
     </Routes>
   );
 }
