@@ -25,6 +25,7 @@ router.get('/admin/access',               requireAdmin, c.adminListAccess);
 router.post('/admin/access',              requireAdmin, c.adminGrantAccess);
 router.delete('/admin/access/:id',        requireAdmin, c.adminRevokeAccess);
 router.get('/admin/logs',                 requireAdmin, c.adminLogs);
+router.get('/admin/vehicle-history',      requireAdmin, c.adminVehicleHistory);
 router.get('/admin/notes',                requireAdmin, c.adminAllNotes);
 router.post('/admin/notes',               requireAdmin, c.adminAddNote);
 router.delete('/admin/notes/:id',         requireAdmin, c.adminDeleteNote);

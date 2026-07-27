@@ -122,6 +122,20 @@ exports.adminLogs = async (req, res) => {
   } catch (e) { err(res, e.message, 500); }
 };
 
+// ── Admin: full vehicle history (all dates) ───────────────────────────────────
+
+exports.adminVehicleHistory = async (req, res) => {
+  try {
+    const { devIdno, mechanic_user_id } = req.query;
+    if (!devIdno) return err(res, 'devIdno is required');
+    const logs = await M.getLogsForVehicle({ devIdno, mechanic_user_id });
+    const attachments = await M.getAttachmentsForLogs(logs.map(l => l.id));
+    const byLog = {};
+    for (const a of attachments) { (byLog[a.log_id] = byLog[a.log_id] || []).push(a); }
+    ok(res, logs.map(l => ({ ...l, attachments: byLog[l.id] || [] })));
+  } catch (e) { err(res, e.message, 500); }
+};
+
 // ── Admin: add note for mechanics ─────────────────────────────────────────────
 
 exports.adminAddNote = async (req, res) => {

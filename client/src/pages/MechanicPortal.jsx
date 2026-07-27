@@ -375,6 +375,13 @@ function AdminView() {
   const [logMechanic, setLogMechanic] = useState('');
   const [logVehicle, setLogVehicle] = useState('');
 
+  // Vehicle history
+  const [histVehicle, setHistVehicle] = useState('');
+  const [histMechanic, setHistMechanic] = useState('');
+  const [histLogs, setHistLogs] = useState([]);
+  const [histLoading, setHistLoading] = useState(false);
+  const [histSearched, setHistSearched] = useState(false);
+
   // Admin note form
   const [noteVehicle, setNoteVehicle] = useState('');
   const [noteText, setNoteText] = useState('');
@@ -404,6 +411,19 @@ function AdminView() {
       const r = await api.get('/mechanic/admin/logs', { params });
       setLogs(r.data.data || []);
     } catch {}
+  };
+
+  const loadHistory = async () => {
+    if (!histVehicle) return toast.error('Select a vehicle first');
+    setHistLoading(true);
+    setHistSearched(true);
+    try {
+      const params = { devIdno: histVehicle };
+      if (histMechanic) params.mechanic_user_id = histMechanic;
+      const r = await api.get('/mechanic/admin/vehicle-history', { params });
+      setHistLogs(r.data.data || []);
+    } catch { toast.error('Failed to load history'); }
+    finally { setHistLoading(false); }
   };
 
   const grant = async () => {
@@ -459,9 +479,10 @@ function AdminView() {
       <h1 className="text-xl font-bold text-gray-900">Mechanic Management</h1>
 
       <div className="flex border-b border-gray-200 gap-1">
-        <Tab id="access" label="Vehicle Access" />
-        <Tab id="logs"   label="Work Logs" />
-        <Tab id="notes"  label="Vehicle Notes" />
+        <Tab id="access"  label="Vehicle Access" />
+        <Tab id="logs"    label="Work Logs" />
+        <Tab id="history" label="Vehicle History" />
+        <Tab id="notes"   label="Vehicle Notes" />
       </div>
 
       {/* ── Access tab ── */}
@@ -572,6 +593,78 @@ function AdminView() {
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Vehicle History tab ── */}
+      {tab === 'history' && (
+        <div className="space-y-4">
+          <div className="card p-5 space-y-4">
+            <h2 className="text-sm font-bold text-gray-700">Search full history for a vehicle</h2>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div>
+                <label className="label">Vehicle</label>
+                <VehicleSearch vehicles={vehicles} value={histVehicle} onChange={v => { setHistVehicle(v); setHistSearched(false); }} />
+              </div>
+              <div>
+                <label className="label">Filter by mechanic (optional)</label>
+                <select className="input" value={histMechanic} onChange={e => setHistMechanic(e.target.value)}>
+                  <option value="">All mechanics</option>
+                  {mechanics.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col justify-end">
+                <button onClick={loadHistory} disabled={histLoading || !histVehicle} className="btn btn-primary w-full">
+                  {histLoading ? 'Loading…' : 'Search history'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {histSearched && !histLoading && (
+            histLogs.length === 0 ? (
+              <div className="card p-10 text-center text-gray-400">
+                No work logs found for {vehicles.find(v => v.devIdno === histVehicle)?.plate || histVehicle}.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500 font-medium">
+                  {histLogs.length} log{histLogs.length !== 1 ? 's' : ''} for {vehicles.find(v => v.devIdno === histVehicle)?.plate}
+                </p>
+                {histLogs.map(l => (
+                  <div key={l.id} className="card p-4">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
+                      <span className="text-xs font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-full">
+                        {fmtDate(l.log_date)}
+                      </span>
+                      <span className="text-xs text-gray-400">{fmtTs(l.recorded_at)}</span>
+                      <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">🔧 {l.mechanic_name}</span>
+                    </div>
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{l.note}</p>
+                    {l.attachments?.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <p className="text-xs text-gray-400 mb-2">📎 {l.attachments.length} attachment{l.attachments.length !== 1 ? 's' : ''}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {l.attachments.map(a => (
+                            <a key={a.id} href={`/uploads/mechanic/${l.id}/${a.filename}`} target="_blank" rel="noreferrer"
+                              className="group flex flex-col items-center gap-1">
+                              {isImage(a.mime_type) ? (
+                                <img src={`/uploads/mechanic/${l.id}/${a.filename}`} alt={a.original_name}
+                                  className="w-20 h-20 object-cover rounded-lg border border-gray-200 group-hover:opacity-80 transition-opacity" />
+                              ) : (
+                                <div className="w-20 h-20 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-2xl">📄</div>
+                              )}
+                              <span className="text-[10px] text-gray-500 max-w-[80px] truncate">{a.original_name}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
           )}
         </div>
       )}
