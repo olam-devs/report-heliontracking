@@ -481,10 +481,6 @@ function AdminView() {
     api.get('/mechanic/admin/notes').then(r => setAdminNotes(r.data.data || [])).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (tab === 'logs') loadLogs();
-  }, [tab, logDateFrom, logDateTo, logMechanic, logVehicle]);
-
   const loadGrants = () => {
     api.get('/mechanic/admin/access').then(r => setGrants(r.data.data || [])).catch(() => {});
   };
@@ -498,6 +494,10 @@ function AdminView() {
       setLogs(r.data.data || []);
     } catch {}
   };
+
+  useEffect(() => {
+    if (tab === 'logs') loadLogs();
+  }, [tab, logDateFrom, logDateTo, logMechanic, logVehicle]);
 
   const loadHistory = async () => {
     if (!histVehicle) return toast.error('Select a vehicle first');
