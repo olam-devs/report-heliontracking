@@ -157,6 +157,9 @@ function AddLogForm({ devIdno, plate, onAdded }) {
 
 // ── Mechanic portal (mechanic's own view) ────────────────────────────────────
 function MechanicView() {
+  const [tab, setTab] = useState('today');
+
+  // Today's work
   const [grants, setGrants] = useState([]);
   const [selected, setSelected] = useState(null);
   const [status, setStatus] = useState(null);
@@ -164,12 +167,19 @@ function MechanicView() {
   const [logs, setLogs] = useState([]);
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
+
+  // History
+  const [workedVehicles, setWorkedVehicles] = useState([]);
+  const [histVehicle, setHistVehicle] = useState(null);
+  const [histLogs, setHistLogs] = useState([]);
+  const [histNotes, setHistNotes] = useState([]);
+  const [histLoading, setHistLoading] = useState(false);
+
   const today = todayStr();
 
   useEffect(() => {
-    api.get('/mechanic/my-vehicles').then(r => {
-      setGrants(r.data.data || []);
-    }).catch(() => toast.error('Failed to load vehicles'));
+    api.get('/mechanic/my-vehicles').then(r => setGrants(r.data.data || [])).catch(() => {});
+    api.get('/mechanic/my-worked-vehicles').then(r => setWorkedVehicles(r.data.data || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -206,89 +216,165 @@ function MechanicView() {
     } catch {} finally { setLogsLoading(false); }
   };
 
+  useEffect(() => {
+    if (!histVehicle) { setHistLogs([]); setHistNotes([]); return; }
+    setHistLoading(true);
+    Promise.all([
+      api.get('/mechanic/my-logs', { params: { devIdno: histVehicle } }),
+      api.get(`/mechanic/admin-notes/${histVehicle}`),
+    ]).then(([logsRes, notesRes]) => {
+      setHistLogs(logsRes.data.data || []);
+      setHistNotes(notesRes.data.data || []);
+    }).catch(() => {}).finally(() => setHistLoading(false));
+  }, [histVehicle]);
+
   const grant = grants.find(g => g.devIdno === selected);
+
+  const MechTab = ({ id, label }) => (
+    <button onClick={() => setTab(id)}
+      className={`flex-1 py-2.5 text-sm font-semibold border-b-2 transition-colors ${tab === id ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-400'}`}>
+      {label}
+    </button>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="px-4 pt-4 pb-1">
-        <h1 className="text-base font-bold text-gray-800">My Worklog</h1>
-        <p className="text-xs text-gray-400">{fmtDate(today)}</p>
+      <div className="flex border-b border-gray-200 bg-white sticky top-[52px] z-10">
+        <MechTab id="today" label="Today's Work" />
+        <MechTab id="history" label="My History" />
       </div>
 
-      <div className="p-4 space-y-4 max-w-lg mx-auto">
-        {/* Vehicle selector */}
-        {grants.length === 0 ? (
-          <div className="bg-white rounded-2xl p-8 text-center shadow-sm mt-4">
-            <div className="text-5xl mb-3">🔧</div>
-            <p className="font-semibold text-gray-700">No vehicles assigned today</p>
-            <p className="text-sm text-gray-400 mt-1">Your supervisor will grant you access to vehicles for today.</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Select vehicle</p>
-            <div className="grid grid-cols-2 gap-2">
-              {grants.map(g => (
-                <button key={g.id} onClick={() => setSelected(selected === g.devIdno ? null : g.devIdno)}
-                  className={`py-3 px-3 rounded-xl border-2 text-sm font-bold transition-all active:scale-95 ${
-                    selected === g.devIdno
-                      ? 'bg-brand-600 text-white border-brand-600 shadow-md'
-                      : 'bg-white text-gray-700 border-gray-200'
-                  }`}>
-                  {g.plate}
-                  {g.can_see_status && <div className="text-[10px] mt-0.5 opacity-70">📊 Status</div>}
-                </button>
-              ))}
+      {/* ── Today's Work tab ── */}
+      {tab === 'today' && (
+        <div className="p-4 space-y-4 max-w-lg mx-auto">
+          {grants.length === 0 ? (
+            <div className="bg-white rounded-2xl p-8 text-center shadow-sm mt-4">
+              <div className="text-5xl mb-3">🔧</div>
+              <p className="font-semibold text-gray-700">No vehicles assigned today</p>
+              <p className="text-sm text-gray-400 mt-1">Your supervisor will grant you access to vehicles for today.</p>
             </div>
-          </div>
-        )}
-
-        {selected && grant && (
-          <>
-            {/* Live status */}
-            {grant.can_see_status && (
-              <div className="bg-white rounded-2xl p-4 shadow-sm">
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Live status — {grant.plate}</p>
-                {loadingStatus ? <span className="text-xs text-gray-400">Loading…</span> : <StatusRow status={status} />}
-              </div>
-            )}
-
-            {/* Admin notes */}
-            {adminNotes.length > 0 && (
-              <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3">
-                <div className="text-xs font-bold uppercase tracking-wider text-amber-700">📋 Notes from supervisor</div>
-                {adminNotes.map(n => (
-                  <div key={n.id} className="text-sm text-amber-900 bg-white/60 rounded-xl p-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold">{n.created_by_name}</span>
-                      <span className="text-amber-600 text-xs">{fmtTs(n.created_at)}</span>
-                    </div>
-                    <p className="whitespace-pre-wrap leading-relaxed">{n.note}</p>
-                  </div>
+          ) : (
+            <div className="bg-white rounded-2xl p-4 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Select vehicle</p>
+              <div className="grid grid-cols-2 gap-2">
+                {grants.map(g => (
+                  <button key={g.id} onClick={() => setSelected(selected === g.devIdno ? null : g.devIdno)}
+                    className={`py-3 px-3 rounded-xl border-2 text-sm font-bold transition-all active:scale-95 ${
+                      selected === g.devIdno
+                        ? 'bg-brand-600 text-white border-brand-600 shadow-md'
+                        : 'bg-white text-gray-700 border-gray-200'
+                    }`}>
+                    {g.plate}
+                    {g.can_see_status && <div className="text-[10px] mt-0.5 opacity-70">📊 Status</div>}
+                  </button>
                 ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Add log */}
-            <AddLogForm devIdno={selected} plate={grant.plate} onAdded={loadLogs} />
-
-            {/* History */}
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 px-1">
-                History — {grant.plate} ({logs.length} entr{logs.length === 1 ? 'y' : 'ies'})
-              </p>
-              {logsLoading ? (
-                <div className="text-sm text-gray-400 py-8 text-center">Loading…</div>
-              ) : logs.length === 0 ? (
-                <div className="bg-white rounded-2xl p-8 text-center text-sm text-gray-400 shadow-sm">No logs yet for this vehicle.</div>
-              ) : (
-                <div className="space-y-3">
-                  {logs.map(l => <LogCard key={l.id} log={l} isToday={String(l.log_date).slice(0,10) === today} />)}
+          {selected && grant && (
+            <>
+              {grant.can_see_status && (
+                <div className="bg-white rounded-2xl p-4 shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Live status — {grant.plate}</p>
+                  {loadingStatus ? <span className="text-xs text-gray-400">Loading…</span> : <StatusRow status={status} />}
                 </div>
               )}
+              {adminNotes.length > 0 && (
+                <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3">
+                  <div className="text-xs font-bold uppercase tracking-wider text-amber-700">📋 Notes from supervisor</div>
+                  {adminNotes.map(n => (
+                    <div key={n.id} className="text-sm text-amber-900 bg-white/60 rounded-xl p-3">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="font-semibold">{n.created_by_name}</span>
+                        <span className="text-amber-600 text-xs">{fmtTs(n.created_at)}</span>
+                      </div>
+                      <p className="whitespace-pre-wrap break-words leading-relaxed">{n.note}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <AddLogForm devIdno={selected} plate={grant.plate} onAdded={loadLogs} />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 px-1">
+                  Today's logs — {grant.plate}
+                </p>
+                {logsLoading ? (
+                  <div className="text-sm text-gray-400 py-8 text-center">Loading…</div>
+                ) : logs.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-6 text-center text-sm text-gray-400 shadow-sm">No logs yet today.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {logs.map(l => <LogCard key={l.id} log={l} isToday={String(l.log_date).slice(0,10) === today} />)}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── My History tab ── */}
+      {tab === 'history' && (
+        <div className="p-4 space-y-4 max-w-lg mx-auto">
+          {workedVehicles.length === 0 ? (
+            <div className="bg-white rounded-2xl p-8 text-center shadow-sm mt-4">
+              <div className="text-4xl mb-3">📋</div>
+              <p className="font-semibold text-gray-700">No history yet</p>
+              <p className="text-sm text-gray-400 mt-1">Your work logs will appear here.</p>
             </div>
-          </>
-        )}
-      </div>
+          ) : (
+            <>
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Select vehicle</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {workedVehicles.map(v => (
+                    <button key={v.devIdno} onClick={() => setHistVehicle(histVehicle === v.devIdno ? null : v.devIdno)}
+                      className={`py-3 px-3 rounded-xl border-2 text-sm font-bold transition-all active:scale-95 ${
+                        histVehicle === v.devIdno
+                          ? 'bg-brand-600 text-white border-brand-600 shadow-md'
+                          : 'bg-white text-gray-700 border-gray-200'
+                      }`}>
+                      {v.plate}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {histVehicle && (
+                histLoading ? (
+                  <div className="text-sm text-gray-400 py-8 text-center">Loading…</div>
+                ) : (
+                  <div className="space-y-4">
+                    {histNotes.length > 0 && (
+                      <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3">
+                        <div className="text-xs font-bold uppercase tracking-wider text-amber-700">📋 Supervisor notes for this vehicle</div>
+                        {histNotes.map(n => (
+                          <div key={n.id} className="text-sm text-amber-900 bg-white/60 rounded-xl p-3">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-semibold">{n.created_by_name}</span>
+                              <span className="text-amber-600 text-xs">{fmtTs(n.created_at)}</span>
+                            </div>
+                            <p className="whitespace-pre-wrap break-words leading-relaxed">{n.note}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {histLogs.length === 0 ? (
+                      <div className="bg-white rounded-2xl p-6 text-center text-sm text-gray-400 shadow-sm">No logs yet for this vehicle.</div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-xs text-gray-400 px-1">{histLogs.length} log{histLogs.length !== 1 ? 's' : ''}</p>
+                        {histLogs.map(l => <LogCard key={l.id} log={l} isToday={String(l.log_date).slice(0,10) === today} />)}
+                      </div>
+                    )}
+                  </div>
+                )
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -579,7 +665,7 @@ function AdminView() {
                     <span className="text-xs text-gray-400">{fmtTs(l.recorded_at)}</span>
                     <span className="text-xs font-medium text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">🔧 {l.mechanic_name}</span>
                   </div>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{l.note}</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{l.note}</p>
                   {l.attachments?.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
                       {l.attachments.map(a => (
@@ -641,7 +727,7 @@ function AdminView() {
                       <span className="text-xs text-gray-400">{fmtTs(l.recorded_at)}</span>
                       <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">🔧 {l.mechanic_name}</span>
                     </div>
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{l.note}</p>
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{l.note}</p>
                     {l.attachments?.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-gray-100">
                         <p className="text-xs text-gray-400 mb-2">📎 {l.attachments.length} attachment{l.attachments.length !== 1 ? 's' : ''}</p>
@@ -704,7 +790,7 @@ function AdminView() {
                     <span className="text-xs text-gray-400">{fmtTs(n.created_at)}</span>
                     <span className="text-xs text-gray-500">by {n.created_by_name}</span>
                   </div>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{n.note}</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{n.note}</p>
                 </div>
                 <button onClick={() => deleteNote(n.id)} className="shrink-0 text-red-400 hover:text-red-600 text-sm">✕</button>
               </div>

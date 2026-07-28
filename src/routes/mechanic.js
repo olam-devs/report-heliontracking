@@ -17,6 +17,7 @@ router.get('/vehicle-status/:devIdno',    requireMechanic, c.vehicleStatus);
 router.post('/logs',                      requireMechanic, c.addLog);
 router.post('/logs/:logId/attachments',   requireMechanic, upload.single('file'), c.addAttachment);
 router.get('/my-logs',                    requireMechanic, c.myLogs);
+router.get('/my-worked-vehicles',         requireMechanic, c.myWorkedVehicles);
 router.get('/admin-notes/:devIdno',       requireMechanic, c.adminNotes);
 
 // Admin-only routes

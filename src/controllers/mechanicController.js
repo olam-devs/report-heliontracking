@@ -65,10 +65,20 @@ exports.myLogs = async (req, res) => {
   try {
     const { devIdno, date } = req.query;
     const logs = await M.getLogsForVehicle({ mechanic_user_id: req.user.id, devIdno, date });
-    const attachments = await M.getAttachmentsForLogs(logs.map(l => l.id));
+    const ids = logs.map(l => l.id);
+    const attachments = ids.length ? await M.getAttachmentsForLogs(ids) : [];
     const byLog = {};
     for (const a of attachments) { (byLog[a.log_id] = byLog[a.log_id] || []).push(a); }
     ok(res, logs.map(l => ({ ...l, attachments: byLog[l.id] || [] })));
+  } catch (e) { err(res, e.message, 500); }
+};
+
+// ── Mechanic: all vehicles I've ever worked on (for history tab) ──────────────
+
+exports.myWorkedVehicles = async (req, res) => {
+  try {
+    const vehicles = await M.getWorkedVehicles(req.user.id);
+    ok(res, vehicles);
   } catch (e) { err(res, e.message, 500); }
 };
 

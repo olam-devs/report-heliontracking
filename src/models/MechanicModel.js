@@ -105,6 +105,14 @@ exports.getLogsForDate = async ({ date, mechanic_user_id, devIdno }) => {
   return rows;
 };
 
+exports.getWorkedVehicles = async (mechanic_user_id) => {
+  const [rows] = await db.query(
+    `SELECT DISTINCT devIdno, plate FROM mechanic_logs WHERE mechanic_user_id = ? ORDER BY plate`,
+    [mechanic_user_id]
+  );
+  return rows;
+};
+
 exports.getLogById = async (id) => {
   const [rows] = await db.query('SELECT * FROM mechanic_logs WHERE id = ?', [id]);
   return rows[0] || null;
