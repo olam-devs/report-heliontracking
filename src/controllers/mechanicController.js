@@ -123,9 +123,14 @@ exports.adminRevokeAccess = async (req, res) => {
 
 exports.adminLogs = async (req, res) => {
   try {
-    const { date, mechanic_user_id, devIdno } = req.query;
-    const logs = await M.getLogsForDate({ date, mechanic_user_id, devIdno });
-    const attachments = await M.getAttachmentsForLogs(logs.map(l => l.id));
+    let { date_from, date_to, mechanic_user_id, devIdno } = req.query;
+    if (date_from && date_to) {
+      const diff = (new Date(date_to) - new Date(date_from)) / 86400000;
+      if (diff > 6) date_to = new Date(new Date(date_from).getTime() + 6 * 86400000).toISOString().slice(0, 10);
+    }
+    const logs = await M.getLogsForDate({ date_from, date_to, mechanic_user_id, devIdno });
+    const ids = logs.map(l => l.id);
+    const attachments = ids.length ? await M.getAttachmentsForLogs(ids) : [];
     const byLog = {};
     for (const a of attachments) { (byLog[a.log_id] = byLog[a.log_id] || []).push(a); }
     ok(res, logs.map(l => ({ ...l, attachments: byLog[l.id] || [] })));

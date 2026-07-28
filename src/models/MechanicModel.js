@@ -94,13 +94,16 @@ exports.getLogsForVehicle = async ({ mechanic_user_id, devIdno, date }) => {
   return rows;
 };
 
-exports.getLogsForDate = async ({ date, mechanic_user_id, devIdno }) => {
+exports.getLogsForDate = async ({ date_from, date_to, mechanic_user_id, devIdno }) => {
+  const from = date_from || todayStr();
+  const to   = date_to   || from;
   let sql = `SELECT ml.*, u.name AS mechanic_name FROM mechanic_logs ml
-             JOIN users u ON u.id = ml.mechanic_user_id WHERE ml.log_date = ?`;
-  const params = [date || todayStr()];
+             JOIN users u ON u.id = ml.mechanic_user_id
+             WHERE ml.log_date BETWEEN ? AND ?`;
+  const params = [from, to];
   if (mechanic_user_id) { sql += ' AND ml.mechanic_user_id = ?'; params.push(mechanic_user_id); }
   if (devIdno) { sql += ' AND ml.devIdno = ?'; params.push(devIdno); }
-  sql += ' ORDER BY ml.recorded_at DESC';
+  sql += ' ORDER BY ml.log_date DESC, ml.recorded_at DESC';
   const [rows] = await db.query(sql, params);
   return rows;
 };

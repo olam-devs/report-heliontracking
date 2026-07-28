@@ -457,7 +457,8 @@ function AdminView() {
   const [granting, setGranting] = useState(false);
 
   // Logs filter
-  const [logDate, setLogDate] = useState(todayStr());
+  const [logDateFrom, setLogDateFrom] = useState(todayStr());
+  const [logDateTo, setLogDateTo] = useState(todayStr());
   const [logMechanic, setLogMechanic] = useState('');
   const [logVehicle, setLogVehicle] = useState('');
 
@@ -482,7 +483,7 @@ function AdminView() {
 
   useEffect(() => {
     if (tab === 'logs') loadLogs();
-  }, [tab, logDate, logMechanic, logVehicle]);
+  }, [tab, logDateFrom, logDateTo, logMechanic, logVehicle]);
 
   const loadGrants = () => {
     api.get('/mechanic/admin/access').then(r => setGrants(r.data.data || [])).catch(() => {});
@@ -490,10 +491,9 @@ function AdminView() {
 
   const loadLogs = async () => {
     try {
-      const params = { date: logDate };
+      const params = { date_from: logDateFrom, date_to: logDateTo };
       if (logMechanic) params.mechanic_user_id = logMechanic;
-      const selectedVehicle = vehicles.find(v => v.plate === logVehicle);
-      if (selectedVehicle) params.devIdno = selectedVehicle.devIdno;
+      if (logVehicle) params.devIdno = logVehicle;
       const r = await api.get('/mechanic/admin/logs', { params });
       setLogs(r.data.data || []);
     } catch {}
@@ -635,22 +635,39 @@ function AdminView() {
       {/* ── Logs tab ── */}
       {tab === 'logs' && (
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-3 items-end">
-            <div>
-              <label className="label">Date</label>
-              <input type="date" className="input" value={logDate} onChange={e => setLogDate(e.target.value)} />
+          <div className="card p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">From date</label>
+                <input type="date" className="input" value={logDateFrom}
+                  onChange={e => {
+                    setLogDateFrom(e.target.value);
+                    // Auto-cap to_date to max 7 days
+                    const max = new Date(new Date(e.target.value).getTime() + 6 * 86400000).toISOString().slice(0,10);
+                    if (logDateTo > max) setLogDateTo(max);
+                    if (logDateTo < e.target.value) setLogDateTo(e.target.value);
+                  }} />
+              </div>
+              <div>
+                <label className="label">To date <span className="text-gray-400 font-normal">(max 7 days)</span></label>
+                <input type="date" className="input" value={logDateTo}
+                  min={logDateFrom}
+                  max={new Date(new Date(logDateFrom).getTime() + 6 * 86400000).toISOString().slice(0,10)}
+                  onChange={e => setLogDateTo(e.target.value)} />
+              </div>
             </div>
-            <div>
-              <label className="label">Mechanic</label>
-              <select className="input" value={logMechanic} onChange={e => setLogMechanic(e.target.value)}>
-                <option value="">All mechanics</option>
-                {mechanics.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="label">Vehicle plate</label>
-              <input className="input" list="veh-list" value={logVehicle} onChange={e => setLogVehicle(e.target.value)} placeholder="Any vehicle…" />
-              <datalist id="veh-list">{vehicles.map(v => <option key={v.devIdno} value={v.plate} />)}</datalist>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Mechanic</label>
+                <select className="input" value={logMechanic} onChange={e => setLogMechanic(e.target.value)}>
+                  <option value="">All mechanics</option>
+                  {mechanics.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label">Vehicle</label>
+                <VehicleSearch vehicles={vehicles} value={logVehicle} onChange={setLogVehicle} placeholder="All vehicles…" />
+              </div>
             </div>
           </div>
 
@@ -662,6 +679,7 @@ function AdminView() {
                 <div key={l.id} className="card p-4">
                   <div className="flex items-center gap-3 mb-2 flex-wrap">
                     <span className="font-semibold text-sm text-gray-900">{l.plate}</span>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">📅 {l.log_date}</span>
                     <span className="text-xs text-gray-400">{fmtTs(l.recorded_at)}</span>
                     <span className="text-xs font-medium text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">🔧 {l.mechanic_name}</span>
                   </div>
