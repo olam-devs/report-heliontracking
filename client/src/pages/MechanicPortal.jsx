@@ -144,7 +144,7 @@ function AddLogForm({ devIdno, plate, onAdded }) {
         {files.length > 0 && (
           <button onClick={() => setFiles([])} className="px-3 text-red-400 text-sm border border-red-200 rounded-xl">✕</button>
         )}
-        <input ref={fileRef} type="file" multiple accept="image/*,video/*,.pdf"
+        <input ref={fileRef} type="file" multiple
           className="hidden" onChange={e => setFiles(Array.from(e.target.files))} />
         <button onClick={submit} disabled={saving || !note.trim()}
           className="flex-1 btn btn-primary py-2.5 text-sm font-bold rounded-xl disabled:opacity-40">
@@ -422,7 +422,7 @@ function AdminView() {
       if (histMechanic) params.mechanic_user_id = histMechanic;
       const r = await api.get('/mechanic/admin/vehicle-history', { params });
       setHistLogs(r.data.data || []);
-    } catch { toast.error('Failed to load history'); }
+    } catch (e) { toast.error(e.response?.data?.error || 'Failed to load history'); }
     finally { setHistLoading(false); }
   };
 

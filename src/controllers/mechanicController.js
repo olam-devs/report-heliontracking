@@ -128,12 +128,19 @@ exports.adminVehicleHistory = async (req, res) => {
   try {
     const { devIdno, mechanic_user_id } = req.query;
     if (!devIdno) return err(res, 'devIdno is required');
-    const logs = await M.getLogsForVehicle({ devIdno, mechanic_user_id });
-    const attachments = await M.getAttachmentsForLogs(logs.map(l => l.id));
+    const logs = await M.getLogsForVehicle({
+      devIdno,
+      mechanic_user_id: mechanic_user_id || null,
+    });
+    const ids = logs.map(l => l.id);
+    const attachments = ids.length ? await M.getAttachmentsForLogs(ids) : [];
     const byLog = {};
     for (const a of attachments) { (byLog[a.log_id] = byLog[a.log_id] || []).push(a); }
     ok(res, logs.map(l => ({ ...l, attachments: byLog[l.id] || [] })));
-  } catch (e) { err(res, e.message, 500); }
+  } catch (e) {
+    console.error('[adminVehicleHistory]', e);
+    err(res, e.message, 500);
+  }
 };
 
 // ── Admin: add note for mechanics ─────────────────────────────────────────────
