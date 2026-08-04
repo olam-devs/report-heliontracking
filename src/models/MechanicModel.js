@@ -82,11 +82,11 @@ exports.createLog = async ({ mechanic_user_id, devIdno, plate, note, log_date })
   return r.insertId;
 };
 
-exports.getLogsForVehicle = async ({ mechanic_user_id, devIdno, date }) => {
+exports.getLogsForVehicle = async ({ mechanic_user_id, devIdno, plate, date }) => {
   let sql = `SELECT ml.*, u.name AS mechanic_name FROM mechanic_logs ml
              JOIN users u ON u.id = ml.mechanic_user_id
-             WHERE ml.devIdno = ?`;
-  const params = [devIdno];
+             WHERE (ml.devIdno = ? OR ml.plate = ?)`;
+  const params = [devIdno, plate || devIdno];
   if (mechanic_user_id) { sql += ' AND ml.mechanic_user_id = ?'; params.push(mechanic_user_id); }
   if (date) { sql += ' AND ml.log_date = ?'; params.push(date); }
   sql += ' ORDER BY ml.recorded_at DESC';
@@ -94,15 +94,19 @@ exports.getLogsForVehicle = async ({ mechanic_user_id, devIdno, date }) => {
   return rows;
 };
 
-exports.getLogsForDate = async ({ date_from, date_to, mechanic_user_id, devIdno }) => {
-  const from = date_from || todayStr();
-  const to   = date_to   || from;
+exports.getLogsForDate = async ({ date_from, date_to, mechanic_user_id, devIdno, plate }) => {
   let sql = `SELECT ml.*, u.name AS mechanic_name FROM mechanic_logs ml
-             JOIN users u ON u.id = ml.mechanic_user_id
-             WHERE ml.log_date BETWEEN ? AND ?`;
-  const params = [from, to];
+             JOIN users u ON u.id = ml.mechanic_user_id WHERE 1=1`;
+  const params = [];
+  if (date_from && date_to) {
+    sql += ' AND ml.log_date BETWEEN ? AND ?';
+    params.push(date_from, date_to);
+  }
   if (mechanic_user_id) { sql += ' AND ml.mechanic_user_id = ?'; params.push(mechanic_user_id); }
-  if (devIdno) { sql += ' AND ml.devIdno = ?'; params.push(devIdno); }
+  if (devIdno || plate) {
+    sql += ' AND (ml.devIdno = ? OR ml.plate = ?)';
+    params.push(devIdno || plate, plate || devIdno);
+  }
   sql += ' ORDER BY ml.log_date DESC, ml.recorded_at DESC';
   const [rows] = await db.query(sql, params);
   return rows;

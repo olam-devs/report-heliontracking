@@ -458,11 +458,9 @@ function AdminView() {
   const [grantStatus, setGrantStatus] = useState(false);
   const [granting, setGranting] = useState(false);
 
-  // Logs filter — default to last 7 days so recent work is visible immediately
-  const [logDateFrom, setLogDateFrom] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10);
-  });
-  const [logDateTo, setLogDateTo] = useState(todayStr());
+  // Logs filter — empty by default = show all logs, user can narrow by date
+  const [logDateFrom, setLogDateFrom] = useState('');
+  const [logDateTo, setLogDateTo] = useState('');
   const [logMechanic, setLogMechanic] = useState('');
   const [logVehicle, setLogVehicle] = useState('');
 
@@ -493,9 +491,15 @@ function AdminView() {
     setLogsLoading(true);
     setLogsError('');
     try {
-      const params = { date_from: logDateFrom, date_to: logDateTo };
+      const params = {};
+      if (logDateFrom) params.date_from = logDateFrom;
+      if (logDateTo)   params.date_to   = logDateTo;
       if (logMechanic) params.mechanic_user_id = logMechanic;
-      if (logVehicle) params.devIdno = logVehicle;
+      if (logVehicle) {
+        const v = vehicles.find(x => x.devIdno === logVehicle);
+        params.devIdno = logVehicle;
+        if (v?.plate) params.plate = v.plate;
+      }
       const r = await api.get('/mechanic/admin/logs', { params });
       setLogs(r.data.data || []);
     } catch (e) {
@@ -516,7 +520,9 @@ function AdminView() {
     setHistLoading(true);
     setHistSearched(true);
     try {
+      const v = vehicles.find(x => x.devIdno === histVehicle);
       const params = { devIdno: histVehicle };
+      if (v?.plate) params.plate = v.plate;
       if (histMechanic) params.mechanic_user_id = histMechanic;
       const r = await api.get('/mechanic/admin/vehicle-history', { params });
       setHistLogs(r.data.data || []);

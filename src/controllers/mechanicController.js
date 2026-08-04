@@ -123,12 +123,12 @@ exports.adminRevokeAccess = async (req, res) => {
 
 exports.adminLogs = async (req, res) => {
   try {
-    let { date_from, date_to, mechanic_user_id, devIdno } = req.query;
+    let { date_from, date_to, mechanic_user_id, devIdno, plate } = req.query;
     if (date_from && date_to) {
       const diff = (new Date(date_to) - new Date(date_from)) / 86400000;
       if (diff > 6) date_to = new Date(new Date(date_from).getTime() + 6 * 86400000).toISOString().slice(0, 10);
     }
-    const logs = await M.getLogsForDate({ date_from, date_to, mechanic_user_id, devIdno });
+    const logs = await M.getLogsForDate({ date_from, date_to, mechanic_user_id, devIdno, plate });
     const ids = logs.map(l => l.id);
     const attachments = ids.length ? await M.getAttachmentsForLogs(ids) : [];
     const byLog = {};
@@ -141,10 +141,11 @@ exports.adminLogs = async (req, res) => {
 
 exports.adminVehicleHistory = async (req, res) => {
   try {
-    const { devIdno, mechanic_user_id } = req.query;
-    if (!devIdno) return err(res, 'devIdno is required');
+    const { devIdno, plate, mechanic_user_id } = req.query;
+    if (!devIdno && !plate) return err(res, 'devIdno or plate is required');
     const logs = await M.getLogsForVehicle({
-      devIdno,
+      devIdno: devIdno || null,
+      plate: plate || null,
       mechanic_user_id: mechanic_user_id || null,
     });
     const ids = logs.map(l => l.id);
