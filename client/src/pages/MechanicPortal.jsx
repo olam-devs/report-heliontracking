@@ -360,70 +360,81 @@ function MechanicView() {
       {/* ── My History tab ── */}
       {tab === 'history' && (
         <div className="p-4 space-y-4 max-w-lg mx-auto">
-          {/* Unread alerts */}
+
+          {/* ── Unread supervisor notes — prominent banner ── */}
           {workedVehicles.filter(v => Number(v.unread_notes) > 0).length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-2">📋 New supervisor notes</p>
-              <div className="flex flex-wrap gap-2">
+            <div className="rounded-2xl overflow-hidden border-2 border-amber-400 shadow-md">
+              <div className="bg-amber-400 px-4 py-2.5 flex items-center gap-2">
+                <span className="text-lg">🔔</span>
+                <span className="font-bold text-white text-sm uppercase tracking-wide">New notes from your supervisor</span>
+                <span className="ml-auto bg-white text-amber-600 font-bold text-xs rounded-full px-2 py-0.5">
+                  {workedVehicles.filter(v => Number(v.unread_notes) > 0).reduce((s,v) => s + Number(v.unread_notes), 0)} unread
+                </span>
+              </div>
+              <div className="bg-amber-50 divide-y divide-amber-100">
                 {workedVehicles.filter(v => Number(v.unread_notes) > 0).map(v => (
                   <button key={v.devIdno}
                     onClick={() => { setHistVehicle(v.devIdno); setVehicleSearch(v.plate); }}
-                    className="relative flex items-center gap-1.5 bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-full active:scale-95">
-                    {v.plate}
-                    <span className="bg-white text-amber-600 text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{v.unread_notes}</span>
+                    className="w-full flex items-center justify-between px-4 py-3 active:bg-amber-100 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">🚗</span>
+                      <div className="text-left">
+                        <p className="font-bold text-amber-900 text-sm">{v.plate}</p>
+                        <p className="text-xs text-amber-700">{v.unread_notes} new note{Number(v.unread_notes) > 1 ? 's' : ''} waiting</p>
+                      </div>
+                    </div>
+                    <span className="bg-amber-500 text-white text-xs font-bold rounded-full px-3 py-1">View →</span>
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Search + date range */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+          {/* ── Search vehicle history ── */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="bg-brand-600 px-4 py-3 flex items-center gap-2">
+              <span className="text-white text-sm font-bold">🔍 Search Vehicle History</span>
+            </div>
+            <div className="p-4 space-y-3">
               <input type="text" value={vehicleSearch}
                 onChange={e => { setVehicleSearch(e.target.value); setHistVehicle(null); }}
-                placeholder="Type vehicle plate to search…"
-                className="input w-full pl-8 text-sm" style={{ fontSize: '16px' }} />
-              {vehicleSearch && (
-                <button onClick={() => { setVehicleSearch(''); setHistVehicle(null); }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">✕</button>
+                placeholder="Type vehicle plate number…"
+                className="input w-full text-base font-medium" style={{ fontSize: '16px' }} />
+              {/* Search results dropdown */}
+              {vehicleSearch && !histVehicle && (() => {
+                const matches = workedVehicles.filter(v => v.plate?.toLowerCase().includes(vehicleSearch.toLowerCase()));
+                if (!matches.length) return <p className="text-xs text-gray-400 text-center py-1">No vehicles found</p>;
+                return (
+                  <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    {matches.map(v => (
+                      <button key={v.devIdno} onClick={() => { setHistVehicle(v.devIdno); setVehicleSearch(v.plate); }}
+                        className="w-full text-left px-4 py-3 hover:bg-brand-50 active:bg-brand-100 flex items-center justify-between border-b border-gray-100 last:border-0">
+                        <span className="font-semibold text-gray-800">{v.plate}</span>
+                        {Number(v.unread_notes) > 0
+                          ? <span className="bg-amber-500 text-white text-xs font-bold rounded-full px-2 py-0.5">{v.unread_notes} new</span>
+                          : <span className="text-xs text-gray-400">tap to view →</span>}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <label className="text-xs text-gray-500 font-medium mb-1 block">From date</label>
+                  <input type="date" className="input text-sm" value={histDateFrom}
+                    onChange={e => setHistDateFrom(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium mb-1 block">To date</label>
+                  <input type="date" className="input text-sm" value={histDateTo}
+                    min={histDateFrom || ''} onChange={e => setHistDateTo(e.target.value)} />
+                </div>
+              </div>
+              {(histDateFrom || histDateTo) && (
+                <button onClick={() => { setHistDateFrom(''); setHistDateTo(''); }}
+                  className="text-xs text-red-400 font-medium flex items-center gap-1">✕ Clear date filter</button>
               )}
             </div>
-            {/* Search results dropdown */}
-            {vehicleSearch && !histVehicle && (() => {
-              const matches = workedVehicles.filter(v => v.plate?.toLowerCase().includes(vehicleSearch.toLowerCase()));
-              if (!matches.length) return <p className="text-xs text-gray-400 text-center py-1">No vehicles found</p>;
-              return (
-                <div className="border border-gray-100 rounded-xl overflow-hidden">
-                  {matches.map(v => (
-                    <button key={v.devIdno} onClick={() => { setHistVehicle(v.devIdno); setVehicleSearch(v.plate); }}
-                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-brand-50 flex items-center justify-between border-b border-gray-50 last:border-0">
-                      <span className="font-medium">{v.plate}</span>
-                      {Number(v.unread_notes) > 0 && (
-                        <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">{v.unread_notes} new</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              );
-            })()}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs text-gray-400 mb-1 block">From date</label>
-                <input type="date" className="input text-sm" value={histDateFrom}
-                  onChange={e => setHistDateFrom(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 mb-1 block">To date</label>
-                <input type="date" className="input text-sm" value={histDateTo}
-                  min={histDateFrom || ''} onChange={e => setHistDateTo(e.target.value)} />
-              </div>
-            </div>
-            {(histDateFrom || histDateTo) && (
-              <button onClick={() => { setHistDateFrom(''); setHistDateTo(''); }}
-                className="text-xs text-brand-600 font-medium">✕ Clear date filter</button>
-            )}
           </div>
 
           {/* Merged timeline */}
