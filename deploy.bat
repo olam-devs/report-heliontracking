@@ -24,7 +24,9 @@ call npm run build
 
 echo [5/6] Restarting server...
 cd C:\helion\fleet-incident-reporter
-pm2 restart helion-fleet-reporter --update-env
+pm2 stop helion-fleet-reporter
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr :3002 ^| findstr LISTENING') do taskkill /PID %%a /F 2>nul
+pm2 start helion-fleet-reporter --update-env
 
 echo [6/6] Done!
 pause
