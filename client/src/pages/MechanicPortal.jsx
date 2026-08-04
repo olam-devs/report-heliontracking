@@ -200,6 +200,8 @@ function MechanicView() {
   const [histLogs, setHistLogs] = useState([]);
   const [histNotes, setHistNotes] = useState([]);
   const [histLoading, setHistLoading] = useState(false);
+  const [histDateFrom, setHistDateFrom] = useState('');
+  const [histDateTo, setHistDateTo] = useState('');
 
   const today = todayStr();
 
@@ -358,86 +360,109 @@ function MechanicView() {
       {/* ── My History tab ── */}
       {tab === 'history' && (
         <div className="p-4 space-y-4 max-w-lg mx-auto">
-          {workedVehicles.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 text-center shadow-sm mt-4">
+          {/* Unread alerts */}
+          {workedVehicles.filter(v => Number(v.unread_notes) > 0).length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-2">📋 New supervisor notes</p>
+              <div className="flex flex-wrap gap-2">
+                {workedVehicles.filter(v => Number(v.unread_notes) > 0).map(v => (
+                  <button key={v.devIdno}
+                    onClick={() => { setHistVehicle(v.devIdno); setVehicleSearch(v.plate); }}
+                    className="relative flex items-center gap-1.5 bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-full active:scale-95">
+                    {v.plate}
+                    <span className="bg-white text-amber-600 text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{v.unread_notes}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Search + date range */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+              <input type="text" value={vehicleSearch}
+                onChange={e => { setVehicleSearch(e.target.value); setHistVehicle(null); }}
+                placeholder="Type vehicle plate to search…"
+                className="input w-full pl-8 text-sm" style={{ fontSize: '16px' }} />
+              {vehicleSearch && (
+                <button onClick={() => { setVehicleSearch(''); setHistVehicle(null); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">✕</button>
+              )}
+            </div>
+            {/* Search results dropdown */}
+            {vehicleSearch && !histVehicle && (() => {
+              const matches = workedVehicles.filter(v => v.plate?.toLowerCase().includes(vehicleSearch.toLowerCase()));
+              if (!matches.length) return <p className="text-xs text-gray-400 text-center py-1">No vehicles found</p>;
+              return (
+                <div className="border border-gray-100 rounded-xl overflow-hidden">
+                  {matches.map(v => (
+                    <button key={v.devIdno} onClick={() => { setHistVehicle(v.devIdno); setVehicleSearch(v.plate); }}
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-brand-50 flex items-center justify-between border-b border-gray-50 last:border-0">
+                      <span className="font-medium">{v.plate}</span>
+                      {Number(v.unread_notes) > 0 && (
+                        <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">{v.unread_notes} new</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">From date</label>
+                <input type="date" className="input text-sm" value={histDateFrom}
+                  onChange={e => setHistDateFrom(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">To date</label>
+                <input type="date" className="input text-sm" value={histDateTo}
+                  min={histDateFrom || ''} onChange={e => setHistDateTo(e.target.value)} />
+              </div>
+            </div>
+            {(histDateFrom || histDateTo) && (
+              <button onClick={() => { setHistDateFrom(''); setHistDateTo(''); }}
+                className="text-xs text-brand-600 font-medium">✕ Clear date filter</button>
+            )}
+          </div>
+
+          {/* Merged timeline */}
+          {histVehicle && (
+            histLoading ? (
+              <div className="text-sm text-gray-400 py-8 text-center">Loading…</div>
+            ) : (() => {
+              let timeline = mergeTimeline(histLogs, histNotes);
+              if (histDateFrom) timeline = timeline.filter(i => String(i._ts).slice(0,10) >= histDateFrom);
+              if (histDateTo)   timeline = timeline.filter(i => String(i._ts).slice(0,10) <= histDateTo);
+              const plate = workedVehicles.find(v => v.devIdno === histVehicle)?.plate || histVehicle;
+              return (
+                <div className="space-y-3">
+                  <p className="text-xs text-gray-400 px-1 font-medium">
+                    {timeline.length} item{timeline.length !== 1 ? 's' : ''} — {plate}
+                    {(histDateFrom || histDateTo) && <span className="ml-1 text-brand-500">· filtered</span>}
+                  </p>
+                  {timeline.length === 0 ? (
+                    <div className="bg-white rounded-2xl p-6 text-center text-sm text-gray-400 shadow-sm">
+                      No records in this date range.
+                    </div>
+                  ) : timeline.map(item =>
+                    item._type === 'note' ? (
+                      <NoteTimelineCard key={`n-${item.id}`} note={item} isNew={false} />
+                    ) : (
+                      <LogCard key={`l-${item.id}`} log={item} isToday={String(item.log_date).slice(0,10) === today} />
+                    )
+                  )}
+                </div>
+              );
+            })()
+          )}
+
+          {!histVehicle && !vehicleSearch && workedVehicles.length === 0 && (
+            <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
               <div className="text-4xl mb-3">📋</div>
               <p className="font-semibold text-gray-700">No history yet</p>
               <p className="text-sm text-gray-400 mt-1">Your work logs will appear here.</p>
             </div>
-          ) : (
-            <>
-              {/* Search bar */}
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-                <input
-                  type="text"
-                  value={vehicleSearch}
-                  onChange={e => setVehicleSearch(e.target.value)}
-                  placeholder="Search vehicle plate…"
-                  className="input w-full pl-8 text-sm"
-                  style={{ fontSize: '16px' }}
-                />
-                {vehicleSearch && (
-                  <button onClick={() => setVehicleSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">✕</button>
-                )}
-              </div>
-
-              {/* Vehicle grid */}
-              <div className="grid grid-cols-2 gap-2">
-                {workedVehicles
-                  .filter(v => !vehicleSearch || v.plate?.toLowerCase().includes(vehicleSearch.toLowerCase()))
-                  .map(v => {
-                    const hasUnread = Number(v.unread_notes) > 0;
-                    const isSelected = histVehicle === v.devIdno;
-                    return (
-                      <button key={v.devIdno}
-                        onClick={() => setHistVehicle(isSelected ? null : v.devIdno)}
-                        className={`relative py-3 px-3 rounded-xl border-2 text-sm font-bold transition-all active:scale-95 ${
-                          isSelected
-                            ? 'bg-brand-600 text-white border-brand-600 shadow-md'
-                            : hasUnread
-                            ? 'bg-amber-50 text-amber-900 border-amber-400 shadow-sm'
-                            : 'bg-white text-gray-700 border-gray-200'
-                        }`}>
-                        {v.plate}
-                        {hasUnread && !isSelected && (
-                          <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                            {v.unread_notes}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-              </div>
-
-              {/* Merged timeline */}
-              {histVehicle && (
-                histLoading ? (
-                  <div className="text-sm text-gray-400 py-8 text-center">Loading…</div>
-                ) : (() => {
-                  const timeline = mergeTimeline(histLogs, histNotes);
-                  const plate = workedVehicles.find(v => v.devIdno === histVehicle)?.plate || histVehicle;
-                  return (
-                    <div className="space-y-3">
-                      <p className="text-xs text-gray-400 px-1 font-medium">
-                        {timeline.length} item{timeline.length !== 1 ? 's' : ''} — {plate}
-                      </p>
-                      {timeline.length === 0 ? (
-                        <div className="bg-white rounded-2xl p-6 text-center text-sm text-gray-400 shadow-sm">
-                          No history yet for this vehicle.
-                        </div>
-                      ) : timeline.map((item, idx) =>
-                        item._type === 'note' ? (
-                          <NoteTimelineCard key={`n-${item.id}`} note={item} isNew={false} />
-                        ) : (
-                          <LogCard key={`l-${item.id}`} log={item} isToday={String(item.log_date).slice(0,10) === today} />
-                        )
-                      )}
-                    </div>
-                  );
-                })()
-              )}
-            </>
           )}
         </div>
       )}
@@ -518,6 +543,7 @@ function AdminView() {
   const [logsError, setLogsError] = useState('');
   const [adminNotes, setAdminNotes] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [selectedAdminLog, setSelectedAdminLog] = useState(null);
 
   // Grant form
   const [grantMechanic, setGrantMechanic] = useState('');
@@ -784,28 +810,64 @@ function AdminView() {
           ) : logs.length === 0 ? (
             <div className="card p-10 text-center text-gray-400">No work logs found for this date range.</div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
+              <p className="text-xs text-gray-400 font-medium px-1">{logs.length} log{logs.length !== 1 ? 's' : ''} — click any to view full details</p>
               {logs.map(l => (
-                <div key={l.id} className="card p-4">
-                  <div className="flex items-center gap-3 mb-2 flex-wrap">
-                    <span className="font-semibold text-sm text-gray-900">{l.plate}</span>
+                <div key={l.id} onClick={() => setSelectedAdminLog(l)}
+                  className="card p-4 cursor-pointer hover:border-brand-200 hover:shadow-md transition-all border border-transparent">
+                  <div className="flex items-center gap-3 mb-1.5 flex-wrap">
+                    <span className="font-bold text-sm text-gray-900">{l.plate}</span>
                     <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">📅 {l.log_date}</span>
-                    <span className="text-xs text-gray-400">{fmtTs(l.recorded_at)}</span>
                     <span className="text-xs font-medium text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">🔧 {l.mechanic_name}</span>
+                    {l.attachments?.length > 0 && <span className="text-xs text-gray-400">📎 {l.attachments.length}</span>}
+                    <span className="ml-auto text-xs text-gray-300">view →</span>
                   </div>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{l.note}</p>
-                  {l.attachments?.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
-                      {l.attachments.map(a => (
-                        <a key={a.id} href={`/uploads/mechanic/${l.id}/${a.filename}`} target="_blank" rel="noreferrer"
-                          className="flex items-center gap-1.5 text-xs text-brand-600 hover:underline border border-gray-200 rounded px-2 py-1">
-                          {isImage(a.mime_type) ? '🖼' : '📄'} {a.original_name}
-                        </a>
-                      ))}
+                  <p className="text-sm text-gray-600 line-clamp-2 leading-snug">{l.note}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Log detail modal */}
+          {selectedAdminLog && (
+            <div className="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center p-0 md:p-4"
+              onClick={e => { if (e.target === e.currentTarget) setSelectedAdminLog(null); }}>
+              <div className="bg-white w-full md:max-w-2xl md:rounded-2xl rounded-t-2xl max-h-[90vh] flex flex-col shadow-2xl">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="font-bold text-gray-900">{selectedAdminLog.plate}</span>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">📅 {selectedAdminLog.log_date}</span>
+                    <span className="text-xs font-medium text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">🔧 {selectedAdminLog.mechanic_name}</span>
+                  </div>
+                  <button onClick={() => setSelectedAdminLog(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+                </div>
+                <div className="overflow-y-auto p-5 space-y-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Work note</p>
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-relaxed">{selectedAdminLog.note}</p>
+                  </div>
+                  <p className="text-xs text-gray-400">Recorded: {fmtTs(selectedAdminLog.recorded_at)}</p>
+                  {selectedAdminLog.attachments?.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Attachments ({selectedAdminLog.attachments.length})</p>
+                      <div className="grid grid-cols-3 gap-3">
+                        {selectedAdminLog.attachments.map(a => (
+                          <a key={a.id} href={`/uploads/mechanic/${selectedAdminLog.id}/${a.filename}`} target="_blank" rel="noreferrer"
+                            className="group flex flex-col items-center gap-1.5">
+                            {isImage(a.mime_type) ? (
+                              <img src={`/uploads/mechanic/${selectedAdminLog.id}/${a.filename}`} alt={a.original_name}
+                                className="w-full aspect-square object-cover rounded-xl border border-gray-200 group-hover:opacity-80" />
+                            ) : (
+                              <div className="w-full aspect-square flex items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-3xl">📄</div>
+                            )}
+                            <span className="text-[10px] text-gray-500 text-center w-full truncate">{a.original_name}</span>
+                          </a>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
-              ))}
+              </div>
             </div>
           )}
         </div>
