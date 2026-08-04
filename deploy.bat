@@ -10,6 +10,7 @@ copy "src\models\MechanicModel.js" "C:\helion\fleet-incident-reporter\src\models
 copy "src\middleware\uploadMechanic.js" "C:\helion\fleet-incident-reporter\src\middleware\uploadMechanic.js" /Y
 copy "src\config\db.js" "C:\helion\fleet-incident-reporter\src\config\db.js" /Y
 copy "server.js" "C:\helion\fleet-incident-reporter\server.js" /Y
+copy "run-migrate-v9.js" "C:\helion\fleet-incident-reporter\run-migrate-v9.js" /Y
 
 echo [3/6] Copying frontend files...
 copy "client\src\App.jsx" "C:\helion\fleet-incident-reporter\client\src\App.jsx" /Y
