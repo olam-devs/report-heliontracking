@@ -25,11 +25,7 @@ call npm run build
 
 echo [5/6] Restarting server...
 cd C:\helion\fleet-incident-reporter
-pm2 stop helion-fleet-reporter
-netstat -ano | findstr :3002 | findstr LISTENING > %TEMP%\p3002.txt 2>nul
-for /f "tokens=5" %%a in (%TEMP%\p3002.txt) do taskkill /PID %%a /F 2>nul
-del %TEMP%\p3002.txt 2>nul
-pm2 start helion-fleet-reporter --update-env
+powershell -NoProfile -Command "pm2 stop helion-fleet-reporter; $lines = netstat -ano | Select-String ':3002\s+\S+\s+LISTENING'; foreach ($l in $lines) { $pid = ($l.ToString().Trim() -split '\s+')[-1]; taskkill /PID $pid /F 2>$null }; pm2 start helion-fleet-reporter --update-env"
 
 echo [6/6] Done!
 pause
