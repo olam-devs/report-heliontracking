@@ -456,8 +456,10 @@ function AdminView() {
   const [grantStatus, setGrantStatus] = useState(false);
   const [granting, setGranting] = useState(false);
 
-  // Logs filter
-  const [logDateFrom, setLogDateFrom] = useState(todayStr());
+  // Logs filter — default to last 7 days so recent work is visible immediately
+  const [logDateFrom, setLogDateFrom] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10);
+  });
   const [logDateTo, setLogDateTo] = useState(todayStr());
   const [logMechanic, setLogMechanic] = useState('');
   const [logVehicle, setLogVehicle] = useState('');
