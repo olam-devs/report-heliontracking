@@ -25,7 +25,7 @@ call npm run build
 
 echo [5/6] Restarting server...
 cd C:\helion\fleet-incident-reporter
-powershell -NoProfile -Command "pm2 stop helion-fleet-reporter; $lines = netstat -ano | Select-String ':3002\s+\S+\s+LISTENING'; foreach ($l in $lines) { $pid = ($l.ToString().Trim() -split '\s+')[-1]; taskkill /PID $pid /F 2>$null }; pm2 start helion-fleet-reporter --update-env"
+powershell -NoProfile -Command "pm2 stop helion-fleet-reporter; netstat -ano | Where-Object {$_ -match ':3002\s+\S+\s+LISTENING'} | ForEach-Object {$p=($_.Trim() -split '\s+')[-1]; taskkill /PID $p /F 2>$null}; pm2 start helion-fleet-reporter --update-env"
 
 echo [6/6] Done!
 pause
