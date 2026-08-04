@@ -638,7 +638,7 @@ function AdminView() {
       await api.post('/mechanic/admin/notes', { devIdno: noteVehicle, plate: v?.plate || noteVehicle, note: noteText.trim() });
       toast.success('Note saved');
       setNoteText('');
-      api.get('/mechanic/admin/notes').then(r => setAdminNotes(r.data.data || []));
+      if (histVehicle === noteVehicle && histSearched) loadHistory();
     } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } finally { setSavingNote(false); }
   };
 
@@ -673,7 +673,6 @@ function AdminView() {
         <Tab id="access"  label="Vehicle Access" />
         <Tab id="logs"    label="Work Logs" badge={unreadCount} />
         <Tab id="history" label="Vehicle History" />
-        <Tab id="notes"   label="Vehicle Notes" />
       </div>
 
       {/* ── Access tab ── */}
@@ -815,6 +814,29 @@ function AdminView() {
       {/* ── Vehicle History tab ── */}
       {tab === 'history' && (
         <div className="space-y-4">
+          {/* Add note form */}
+          <div className="card p-5 space-y-3">
+            <h2 className="text-sm font-bold text-gray-700">Add supervisor note for a vehicle</h2>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div>
+                <label className="label">Vehicle</label>
+                <VehicleSearch vehicles={vehicles} value={noteVehicle} onChange={setNoteVehicle} />
+              </div>
+              <div className="md:col-span-2">
+                <label className="label">Note</label>
+                <div className="flex gap-2">
+                  <textarea value={noteText} onChange={e => setNoteText(e.target.value)} rows={1}
+                    placeholder="Write a note for the mechanic on this vehicle…"
+                    className="input flex-1 resize-none text-sm" />
+                  <button onClick={addNote} disabled={savingNote} className="btn btn-primary shrink-0 self-end">
+                    {savingNote ? 'Saving…' : 'Add note'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Search history */}
           <div className="card p-5 space-y-4">
             <h2 className="text-sm font-bold text-gray-700">Search full history for a vehicle</h2>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -887,49 +909,6 @@ function AdminView() {
         </div>
       )}
 
-      {/* ── Notes tab ── */}
-      {tab === 'notes' && (
-        <div className="space-y-4">
-          {/* Add note form */}
-          <div className="card p-5 space-y-3">
-            <h2 className="text-sm font-bold text-gray-700">Leave a note for mechanics on a vehicle</h2>
-            <div>
-              <label className="label">Vehicle</label>
-              <VehicleSearch vehicles={vehicles} value={noteVehicle} onChange={setNoteVehicle} />
-            </div>
-            <textarea value={noteText} onChange={e => setNoteText(e.target.value)} rows={3}
-              placeholder="Note for the mechanic assigned to this vehicle…"
-              className="input w-full resize-none text-sm" />
-            <div className="flex justify-end">
-              <button onClick={addNote} disabled={savingNote} className="btn btn-primary">
-                {savingNote ? 'Saving…' : 'Save note'}
-              </button>
-            </div>
-          </div>
-
-          {/* All admin notes */}
-          <div className="card overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-100 text-sm font-semibold text-gray-700">
-              All vehicle notes ({adminNotes.length})
-            </div>
-            {adminNotes.length === 0 ? (
-              <div className="p-6 text-center text-sm text-gray-400">No notes yet.</div>
-            ) : adminNotes.map(n => (
-              <div key={n.id} className="px-5 py-3 border-b border-gray-50 last:border-0 flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="font-semibold text-sm text-gray-800">{n.plate}</span>
-                    <span className="text-xs text-gray-400">{fmtTs(n.created_at)}</span>
-                    <span className="text-xs text-gray-500">by {n.created_by_name}</span>
-                  </div>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{n.note}</p>
-                </div>
-                <button onClick={() => deleteNote(n.id)} className="shrink-0 text-red-400 hover:text-red-600 text-sm">✕</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
