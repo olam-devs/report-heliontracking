@@ -671,6 +671,7 @@ function AdminView() {
                 <VehicleSearch vehicles={vehicles} value={logVehicle} onChange={setLogVehicle} placeholder="All vehicles…" />
               </div>
             </div>
+            <button onClick={loadLogs} className="btn btn-primary w-full">🔍 Search Logs</button>
           </div>
 
           {logs.length === 0 ? (
