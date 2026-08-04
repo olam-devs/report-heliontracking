@@ -4,7 +4,7 @@ const cms = require('../tracking/lib/services/cmsv6.service');
 const ok  = (res, data, meta = {}) => res.json({ success: true, ...meta, data });
 const err = (res, msg, status = 400) => res.status(status).json({ success: false, error: msg });
 
-// ── Mechanic: list accessible vehicles ───────────────────────────────────────
+// ── Mechanic: list accessible vehicles (kept for compat) ─────────────────────
 
 exports.myVehicles = async (req, res) => {
   try {
@@ -13,29 +13,39 @@ exports.myVehicles = async (req, res) => {
   } catch (e) { err(res, e.message, 500); }
 };
 
-// ── Mechanic: live vehicle status (only if can_see_status) ───────────────────
+// ── Mechanic: all fleet vehicles (full-time access) ──────────────────────────
+
+exports.allVehicles = async (req, res) => {
+  try {
+    const raw = await cms.getAllGPS().catch(() => []);
+    ok(res, raw.map(v => ({
+      devIdno: String(v.devIdno || v.id || ''),
+      plate:   v.plate || v.nm || String(v.devIdno || v.id || ''),
+      online:  (v.ol ?? v.online ?? 0) !== 0,
+      accOn:   v.accOn ?? null,
+      fuel:    v.fuel  ?? null,
+    })));
+  } catch (e) { err(res, e.message, 500); }
+};
+
+// ── Mechanic: live vehicle status ────────────────────────────────────────────
 
 exports.vehicleStatus = async (req, res) => {
   try {
-    const grant = await M.checkAccess(req.user.id, req.params.devIdno);
-    if (!grant) return err(res, 'No access to this vehicle', 403);
-    if (!grant.can_see_status) return err(res, 'Status access not granted', 403);
     const statuses = await cms.getAllGPS().catch(() => []);
     const s = statuses.find(x => String(x.devIdno || x.id) === String(req.params.devIdno));
     ok(res, s || null);
   } catch (e) { err(res, e.message, 500); }
 };
 
-// ── Mechanic: add log ────────────────────────────────────────────────────────
+// ── Mechanic: add log (no access check — full fleet access) ──────────────────
 
 exports.addLog = async (req, res) => {
   try {
     const { devIdno, plate, note, log_date } = req.body;
     if (!note?.trim()) return err(res, 'Note is required');
     if (!devIdno) return err(res, 'devIdno is required');
-    const grant = await M.checkAccess(req.user.id, devIdno);
-    if (!grant) return err(res, 'No access to this vehicle today', 403);
-    const id = await M.createLog({ mechanic_user_id: req.user.id, devIdno, plate: plate || grant.plate, note: note.trim(), log_date });
+    const id = await M.createLog({ mechanic_user_id: req.user.id, devIdno, plate: plate || devIdno, note: note.trim(), log_date });
     const log = await M.getLogById(id);
     ok(res, { ...log, attachments: [] }, { status: 201 });
   } catch (e) { err(res, e.message, 500); }
@@ -73,7 +83,7 @@ exports.myLogs = async (req, res) => {
   } catch (e) { err(res, e.message, 500); }
 };
 
-// ── Mechanic: all vehicles I've ever worked on (for history tab) ──────────────
+// ── Mechanic: all vehicles I've ever worked on ────────────────────────────────
 
 exports.myWorkedVehicles = async (req, res) => {
   try {
@@ -82,12 +92,52 @@ exports.myWorkedVehicles = async (req, res) => {
   } catch (e) { err(res, e.message, 500); }
 };
 
-// ── Mechanic: get admin notes for a vehicle ───────────────────────────────────
+// ── Mechanic: get admin notes for one vehicle ─────────────────────────────────
 
 exports.adminNotes = async (req, res) => {
   try {
     const notes = await M.getAdminNotes(req.params.devIdno);
     ok(res, notes);
+  } catch (e) { err(res, e.message, 500); }
+};
+
+// ── Mechanic: all admin notes across all my vehicles ─────────────────────────
+
+exports.myAllNotes = async (req, res) => {
+  try {
+    ok(res, await M.getAdminNotesForMechanic(req.user.id));
+  } catch (e) { err(res, e.message, 500); }
+};
+
+// ── Mechanic: mark admin notes read for a vehicle ─────────────────────────────
+
+exports.markNotesRead = async (req, res) => {
+  try {
+    await M.markNotesReadForVehicle(req.params.devIdno);
+    ok(res, { marked: true });
+  } catch (e) { err(res, e.message, 500); }
+};
+
+// ── Pending vehicles ──────────────────────────────────────────────────────────
+
+exports.getPendingVehicles = async (req, res) => {
+  try { ok(res, await M.getPendingVehicles()); }
+  catch (e) { err(res, e.message, 500); }
+};
+
+exports.markPending = async (req, res) => {
+  try {
+    const { devIdno, plate, reason } = req.body;
+    if (!devIdno) return err(res, 'devIdno required');
+    await M.markVehiclePending({ devIdno, plate, reason, marked_by: req.user.id });
+    ok(res, { marked: true });
+  } catch (e) { err(res, e.message, 500); }
+};
+
+exports.unmarkPending = async (req, res) => {
+  try {
+    await M.unmarkVehiclePending(req.params.devIdno);
+    ok(res, { unmarked: true });
   } catch (e) { err(res, e.message, 500); }
 };
 
@@ -99,8 +149,6 @@ exports.adminListAccess = async (req, res) => {
   } catch (e) { err(res, e.message, 500); }
 };
 
-// ── Admin: grant access ───────────────────────────────────────────────────────
-
 exports.adminGrantAccess = async (req, res) => {
   try {
     const { mechanic_user_id, devIdno, plate, can_see_status } = req.body;
@@ -109,8 +157,6 @@ exports.adminGrantAccess = async (req, res) => {
     ok(res, { id });
   } catch (e) { err(res, e.message, 500); }
 };
-
-// ── Admin: revoke access ──────────────────────────────────────────────────────
 
 exports.adminRevokeAccess = async (req, res) => {
   try {
@@ -159,7 +205,7 @@ exports.adminVehicleHistory = async (req, res) => {
   }
 };
 
-// ── Admin: add note for mechanics ─────────────────────────────────────────────
+// ── Admin: add / edit / delete note ──────────────────────────────────────────
 
 exports.adminAddNote = async (req, res) => {
   try {
@@ -169,8 +215,6 @@ exports.adminAddNote = async (req, res) => {
     ok(res, { id });
   } catch (e) { err(res, e.message, 500); }
 };
-
-// ── Admin: delete note ────────────────────────────────────────────────────────
 
 exports.adminDeleteNote = async (req, res) => {
   try {
@@ -200,15 +244,6 @@ exports.adminMarkLogsRead = async (req, res) => {
     const { ids } = req.body;
     await M.markLogsRead(ids);
     ok(res, { marked: ids?.length || 0 });
-  } catch (e) { err(res, e.message, 500); }
-};
-
-// ── Mechanic: mark admin notes read for a vehicle ─────────────────────────────
-
-exports.markNotesRead = async (req, res) => {
-  try {
-    await M.markNotesReadForVehicle(req.params.devIdno);
-    ok(res, { marked: true });
   } catch (e) { err(res, e.message, 500); }
 };
 

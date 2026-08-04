@@ -13,12 +13,15 @@ router.use(auth);
 
 // Mechanic routes
 router.get('/my-vehicles',                requireMechanic, c.myVehicles);
+router.get('/all-vehicles',               requireMechanic, c.allVehicles);
 router.get('/vehicle-status/:devIdno',    requireMechanic, c.vehicleStatus);
 router.post('/logs',                      requireMechanic, c.addLog);
 router.post('/logs/:logId/attachments',   requireMechanic, upload.single('file'), c.addAttachment);
 router.get('/my-logs',                    requireMechanic, c.myLogs);
 router.get('/my-worked-vehicles',         requireMechanic, c.myWorkedVehicles);
+router.get('/my-all-notes',               requireMechanic, c.myAllNotes);
 router.get('/admin-notes/:devIdno',       requireMechanic, c.adminNotes);
+router.get('/pending',                    requireMechanic, c.getPendingVehicles);
 
 // Mechanic: mark notes read
 router.post('/mark-notes-read/:devIdno',  requireMechanic, c.markNotesRead);
@@ -36,5 +39,7 @@ router.get('/admin/notes',                requireAdmin, c.adminAllNotes);
 router.post('/admin/notes',               requireAdmin, c.adminAddNote);
 router.put('/admin/notes/:id',            requireAdmin, c.adminEditNote);
 router.delete('/admin/notes/:id',         requireAdmin, c.adminDeleteNote);
+router.post('/admin/pending',             requireAdmin, c.markPending);
+router.delete('/admin/pending/:devIdno',  requireAdmin, c.unmarkPending);
 
 module.exports = router;

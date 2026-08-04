@@ -218,6 +218,47 @@ exports.getAllAdminNotes = async () => {
   return rows;
 };
 
+// ── Pending vehicles ─────────────────────────────────────────────────────────
+
+exports.getPendingVehicles = async () => {
+  const [rows] = await db.query(
+    `SELECT mpv.*, u.name AS marked_by_name
+     FROM mechanic_pending_vehicles mpv
+     LEFT JOIN users u ON u.id = mpv.marked_by
+     ORDER BY mpv.marked_at DESC`
+  );
+  return rows;
+};
+
+exports.markVehiclePending = async ({ devIdno, plate, reason, marked_by }) => {
+  await db.query(
+    `INSERT INTO mechanic_pending_vehicles (devIdno, plate, reason, marked_by)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE plate = VALUES(plate), reason = VALUES(reason),
+       marked_by = VALUES(marked_by), marked_at = NOW()`,
+    [devIdno, plate || devIdno, reason || null, marked_by]
+  );
+};
+
+exports.unmarkVehiclePending = async (devIdno) => {
+  await db.query('DELETE FROM mechanic_pending_vehicles WHERE devIdno = ?', [devIdno]);
+};
+
+// ── Admin notes for all of a mechanic's vehicles ──────────────────────────────
+
+exports.getAdminNotesForMechanic = async (mechanic_user_id) => {
+  const [rows] = await db.query(
+    `SELECT mn.*, u.name AS created_by_name
+     FROM mechanic_admin_notes mn
+     JOIN users u ON u.id = mn.created_by
+     WHERE mn.devIdno IN (SELECT DISTINCT devIdno FROM mechanic_logs WHERE mechanic_user_id = ?)
+        OR mn.plate   IN (SELECT DISTINCT plate   FROM mechanic_logs WHERE mechanic_user_id = ?)
+     ORDER BY mn.created_at DESC`,
+    [mechanic_user_id, mechanic_user_id]
+  );
+  return rows;
+};
+
 // ── Mechanics list ───────────────────────────────────────────────────────────
 
 exports.getMechanics = async () => {
