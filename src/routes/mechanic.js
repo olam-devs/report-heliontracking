@@ -20,7 +20,12 @@ router.get('/my-logs',                    requireMechanic, c.myLogs);
 router.get('/my-worked-vehicles',         requireMechanic, c.myWorkedVehicles);
 router.get('/admin-notes/:devIdno',       requireMechanic, c.adminNotes);
 
+// Mechanic: mark notes read
+router.post('/mark-notes-read/:devIdno',  requireMechanic, c.markNotesRead);
+
 // Admin-only routes
+router.get('/admin/unread-count',         requireAdmin, c.adminUnreadCount);
+router.post('/admin/mark-logs-read',      requireAdmin, c.adminMarkLogsRead);
 router.get('/admin/mechanics',            requireAdmin, c.adminMechanics);
 router.get('/admin/access',               requireAdmin, c.adminListAccess);
 router.post('/admin/access',              requireAdmin, c.adminGrantAccess);

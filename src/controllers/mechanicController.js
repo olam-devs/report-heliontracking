@@ -179,6 +179,30 @@ exports.adminDeleteNote = async (req, res) => {
   } catch (e) { err(res, e.message, 500); }
 };
 
+// ── Admin: unread logs count ──────────────────────────────────────────────────
+
+exports.adminUnreadCount = async (req, res) => {
+  try { ok(res, { count: await M.getUnreadLogsCount() }); }
+  catch (e) { err(res, e.message, 500); }
+};
+
+exports.adminMarkLogsRead = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    await M.markLogsRead(ids);
+    ok(res, { marked: ids?.length || 0 });
+  } catch (e) { err(res, e.message, 500); }
+};
+
+// ── Mechanic: mark admin notes read for a vehicle ─────────────────────────────
+
+exports.markNotesRead = async (req, res) => {
+  try {
+    await M.markNotesReadForVehicle(req.params.devIdno);
+    ok(res, { marked: true });
+  } catch (e) { err(res, e.message, 500); }
+};
+
 // ── Admin: list mechanic users ────────────────────────────────────────────────
 
 exports.adminMechanics = async (req, res) => {

@@ -114,7 +114,13 @@ exports.getLogsForDate = async ({ date_from, date_to, mechanic_user_id, devIdno,
 
 exports.getWorkedVehicles = async (mechanic_user_id) => {
   const [rows] = await db.query(
-    `SELECT DISTINCT devIdno, plate FROM mechanic_logs WHERE mechanic_user_id = ? ORDER BY plate`,
+    `SELECT ml.devIdno, ml.plate,
+            COUNT(DISTINCT an.id) AS total_notes,
+            SUM(CASE WHEN an.id IS NOT NULL AND an.seen_by_mechanic = 0 THEN 1 ELSE 0 END) AS unread_notes
+     FROM (SELECT DISTINCT devIdno, plate FROM mechanic_logs WHERE mechanic_user_id = ?) ml
+     LEFT JOIN mechanic_admin_notes an ON an.devIdno = ml.devIdno OR an.plate = ml.plate
+     GROUP BY ml.devIdno, ml.plate
+     ORDER BY unread_notes DESC, ml.plate ASC`,
     [mechanic_user_id]
   );
   return rows;
@@ -151,6 +157,28 @@ exports.getAttachmentsForLogs = async (logIds) => {
     logIds
   );
   return rows;
+};
+
+// ── Unread / notification helpers ────────────────────────────────────────────
+
+exports.getUnreadLogsCount = async () => {
+  const [rows] = await db.query('SELECT COUNT(*) AS cnt FROM mechanic_logs WHERE seen_by_admin = 0');
+  return Number(rows[0].cnt);
+};
+
+exports.markLogsRead = async (ids) => {
+  if (!ids || !ids.length) return;
+  await db.query(
+    `UPDATE mechanic_logs SET seen_by_admin = 1 WHERE id IN (${ids.map(() => '?').join(',')})`,
+    ids
+  );
+};
+
+exports.markNotesReadForVehicle = async (devIdno) => {
+  await db.query(
+    'UPDATE mechanic_admin_notes SET seen_by_mechanic = 1 WHERE devIdno = ? OR plate = ?',
+    [devIdno, devIdno]
+  );
 };
 
 // ── Admin notes ──────────────────────────────────────────────────────────────

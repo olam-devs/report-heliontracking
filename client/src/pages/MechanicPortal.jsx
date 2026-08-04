@@ -89,6 +89,31 @@ function LogCard({ log, isToday }) {
   );
 }
 
+// ── Admin note in timeline ───────────────────────────────────────────────────
+function NoteTimelineCard({ note, isNew }) {
+  return (
+    <div className={`rounded-2xl border-2 p-4 ${isNew ? 'border-amber-400 bg-amber-50' : 'border-amber-200 bg-amber-50/60'}`}>
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        <span className="text-xs font-bold uppercase tracking-wide text-amber-700">📋 Supervisor Note</span>
+        {isNew && <span className="text-[10px] font-bold bg-amber-400 text-white px-2 py-0.5 rounded-full uppercase">New</span>}
+        <span className="text-xs text-amber-600 ml-auto">{fmtTs(note.created_at)}</span>
+      </div>
+      {note.created_by_name && <p className="text-xs text-amber-700 mb-1">by {note.created_by_name}</p>}
+      <p className="text-sm text-amber-900 whitespace-pre-wrap break-words leading-relaxed">{note.note}</p>
+    </div>
+  );
+}
+
+// ── Merge mechanic logs + admin notes into one sorted timeline ────────────────
+function mergeTimeline(logs, notes) {
+  const items = [
+    ...logs.map(l => ({ ...l, _type: 'log',  _ts: l.log_date || l.recorded_at })),
+    ...notes.map(n => ({ ...n, _type: 'note', _ts: n.created_at })),
+  ];
+  items.sort((a, b) => String(b._ts).localeCompare(String(a._ts)));
+  return items;
+}
+
 // ── Add log form ─────────────────────────────────────────────────────────────
 function AddLogForm({ devIdno, plate, onAdded }) {
   const [note, setNote] = useState('');
@@ -170,6 +195,7 @@ function MechanicView() {
 
   // History
   const [workedVehicles, setWorkedVehicles] = useState([]);
+  const [vehicleSearch, setVehicleSearch] = useState('');
   const [histVehicle, setHistVehicle] = useState(null);
   const [histLogs, setHistLogs] = useState([]);
   const [histNotes, setHistNotes] = useState([]);
@@ -177,9 +203,13 @@ function MechanicView() {
 
   const today = todayStr();
 
+  const refreshWorkedVehicles = () => {
+    api.get('/mechanic/my-worked-vehicles').then(r => setWorkedVehicles(r.data.data || [])).catch(() => {});
+  };
+
   useEffect(() => {
     api.get('/mechanic/my-vehicles').then(r => setGrants(r.data.data || [])).catch(() => {});
-    api.get('/mechanic/my-worked-vehicles').then(r => setWorkedVehicles(r.data.data || [])).catch(() => {});
+    refreshWorkedVehicles();
   }, []);
 
   useEffect(() => {
@@ -225,15 +255,26 @@ function MechanicView() {
     ]).then(([logsRes, notesRes]) => {
       setHistLogs(logsRes.data.data || []);
       setHistNotes(notesRes.data.data || []);
+      const vehicle = workedVehicles.find(v => v.devIdno === histVehicle);
+      if (Number(vehicle?.unread_notes) > 0) {
+        api.post(`/mechanic/mark-notes-read/${histVehicle}`).then(refreshWorkedVehicles).catch(() => {});
+      }
     }).catch(() => {}).finally(() => setHistLoading(false));
   }, [histVehicle]);
 
   const grant = grants.find(g => g.devIdno === selected);
 
-  const MechTab = ({ id, label }) => (
+  const totalUnread = workedVehicles.reduce((s, v) => s + Number(v.unread_notes || 0), 0);
+
+  const MechTab = ({ id, label, badge }) => (
     <button onClick={() => setTab(id)}
-      className={`flex-1 py-2.5 text-sm font-semibold border-b-2 transition-colors ${tab === id ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-400'}`}>
+      className={`relative flex-1 py-2.5 text-sm font-semibold border-b-2 transition-colors ${tab === id ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-400'}`}>
       {label}
+      {badge > 0 && (
+        <span className="absolute top-1.5 right-4 bg-amber-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+          {badge}
+        </span>
+      )}
     </button>
   );
 
@@ -241,7 +282,7 @@ function MechanicView() {
     <div className="min-h-screen bg-gray-50">
       <div className="flex border-b border-gray-200 bg-white sticky top-[52px] z-10">
         <MechTab id="today" label="Today's Work" />
-        <MechTab id="history" label="My History" />
+        <MechTab id="history" label="My History" badge={totalUnread} />
       </div>
 
       {/* ── Today's Work tab ── */}
@@ -325,51 +366,76 @@ function MechanicView() {
             </div>
           ) : (
             <>
-              <div className="bg-white rounded-2xl p-4 shadow-sm">
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Select vehicle</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {workedVehicles.map(v => (
-                    <button key={v.devIdno} onClick={() => setHistVehicle(histVehicle === v.devIdno ? null : v.devIdno)}
-                      className={`py-3 px-3 rounded-xl border-2 text-sm font-bold transition-all active:scale-95 ${
-                        histVehicle === v.devIdno
-                          ? 'bg-brand-600 text-white border-brand-600 shadow-md'
-                          : 'bg-white text-gray-700 border-gray-200'
-                      }`}>
-                      {v.plate}
-                    </button>
-                  ))}
-                </div>
+              {/* Search bar */}
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+                <input
+                  type="text"
+                  value={vehicleSearch}
+                  onChange={e => setVehicleSearch(e.target.value)}
+                  placeholder="Search vehicle plate…"
+                  className="input w-full pl-8 text-sm"
+                  style={{ fontSize: '16px' }}
+                />
+                {vehicleSearch && (
+                  <button onClick={() => setVehicleSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">✕</button>
+                )}
               </div>
 
+              {/* Vehicle grid */}
+              <div className="grid grid-cols-2 gap-2">
+                {workedVehicles
+                  .filter(v => !vehicleSearch || v.plate?.toLowerCase().includes(vehicleSearch.toLowerCase()))
+                  .map(v => {
+                    const hasUnread = Number(v.unread_notes) > 0;
+                    const isSelected = histVehicle === v.devIdno;
+                    return (
+                      <button key={v.devIdno}
+                        onClick={() => setHistVehicle(isSelected ? null : v.devIdno)}
+                        className={`relative py-3 px-3 rounded-xl border-2 text-sm font-bold transition-all active:scale-95 ${
+                          isSelected
+                            ? 'bg-brand-600 text-white border-brand-600 shadow-md'
+                            : hasUnread
+                            ? 'bg-amber-50 text-amber-900 border-amber-400 shadow-sm'
+                            : 'bg-white text-gray-700 border-gray-200'
+                        }`}>
+                        {v.plate}
+                        {hasUnread && !isSelected && (
+                          <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                            {v.unread_notes}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+              </div>
+
+              {/* Merged timeline */}
               {histVehicle && (
                 histLoading ? (
                   <div className="text-sm text-gray-400 py-8 text-center">Loading…</div>
-                ) : (
-                  <div className="space-y-4">
-                    {histNotes.length > 0 && (
-                      <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3">
-                        <div className="text-xs font-bold uppercase tracking-wider text-amber-700">📋 Supervisor notes for this vehicle</div>
-                        {histNotes.map(n => (
-                          <div key={n.id} className="text-sm text-amber-900 bg-white/60 rounded-xl p-3">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className="font-semibold">{n.created_by_name}</span>
-                              <span className="text-amber-600 text-xs">{fmtTs(n.created_at)}</span>
-                            </div>
-                            <p className="whitespace-pre-wrap break-words leading-relaxed">{n.note}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {histLogs.length === 0 ? (
-                      <div className="bg-white rounded-2xl p-6 text-center text-sm text-gray-400 shadow-sm">No logs yet for this vehicle.</div>
-                    ) : (
-                      <div className="space-y-3">
-                        <p className="text-xs text-gray-400 px-1">{histLogs.length} log{histLogs.length !== 1 ? 's' : ''}</p>
-                        {histLogs.map(l => <LogCard key={l.id} log={l} isToday={String(l.log_date).slice(0,10) === today} />)}
-                      </div>
-                    )}
-                  </div>
-                )
+                ) : (() => {
+                  const timeline = mergeTimeline(histLogs, histNotes);
+                  const plate = workedVehicles.find(v => v.devIdno === histVehicle)?.plate || histVehicle;
+                  return (
+                    <div className="space-y-3">
+                      <p className="text-xs text-gray-400 px-1 font-medium">
+                        {timeline.length} item{timeline.length !== 1 ? 's' : ''} — {plate}
+                      </p>
+                      {timeline.length === 0 ? (
+                        <div className="bg-white rounded-2xl p-6 text-center text-sm text-gray-400 shadow-sm">
+                          No history yet for this vehicle.
+                        </div>
+                      ) : timeline.map((item, idx) =>
+                        item._type === 'note' ? (
+                          <NoteTimelineCard key={`n-${item.id}`} note={item} isNew={false} />
+                        ) : (
+                          <LogCard key={`l-${item.id}`} log={item} isToday={String(item.log_date).slice(0,10) === today} />
+                        )
+                      )}
+                    </div>
+                  );
+                })()
               )}
             </>
           )}
@@ -451,6 +517,7 @@ function AdminView() {
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsError, setLogsError] = useState('');
   const [adminNotes, setAdminNotes] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Grant form
   const [grantMechanic, setGrantMechanic] = useState('');
@@ -468,6 +535,7 @@ function AdminView() {
   const [histVehicle, setHistVehicle] = useState('');
   const [histMechanic, setHistMechanic] = useState('');
   const [histLogs, setHistLogs] = useState([]);
+  const [histNotes, setHistNotes] = useState([]);
   const [histLoading, setHistLoading] = useState(false);
   const [histSearched, setHistSearched] = useState(false);
 
@@ -476,11 +544,16 @@ function AdminView() {
   const [noteText, setNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
 
+  const refreshUnreadCount = () => {
+    api.get('/mechanic/admin/unread-count').then(r => setUnreadCount(r.data.data?.count || 0)).catch(() => {});
+  };
+
   useEffect(() => {
     api.get('/mechanic/admin/mechanics').then(r => setMechanics(r.data.data || [])).catch(() => {});
     api.get('/tracking/vehicles').then(r => setVehicles(r.data.data || [])).catch(() => {});
     loadGrants();
     api.get('/mechanic/admin/notes').then(r => setAdminNotes(r.data.data || [])).catch(() => {});
+    refreshUnreadCount();
   }, []);
 
   const loadGrants = () => {
@@ -501,7 +574,12 @@ function AdminView() {
         if (v?.plate) params.plate = v.plate;
       }
       const r = await api.get('/mechanic/admin/logs', { params });
-      setLogs(r.data.data || []);
+      const fetched = r.data.data || [];
+      setLogs(fetched);
+      const unreadIds = fetched.filter(l => !l.seen_by_admin).map(l => l.id);
+      if (unreadIds.length) {
+        api.post('/mechanic/admin/mark-logs-read', { ids: unreadIds }).then(refreshUnreadCount).catch(() => {});
+      }
     } catch (e) {
       const msg = e.response?.data?.error || e.message || 'Failed to load logs';
       setLogsError(msg);
@@ -524,8 +602,12 @@ function AdminView() {
       const params = { devIdno: histVehicle };
       if (v?.plate) params.plate = v.plate;
       if (histMechanic) params.mechanic_user_id = histMechanic;
-      const r = await api.get('/mechanic/admin/vehicle-history', { params });
-      setHistLogs(r.data.data || []);
+      const [logsRes, notesRes] = await Promise.all([
+        api.get('/mechanic/admin/vehicle-history', { params }),
+        api.get(`/mechanic/admin-notes/${histVehicle}`).catch(() => ({ data: { data: [] } })),
+      ]);
+      setHistLogs(logsRes.data.data || []);
+      setHistNotes(notesRes.data.data || []);
     } catch (e) { toast.error(e.response?.data?.error || 'Failed to load history'); }
     finally { setHistLoading(false); }
   };
@@ -565,10 +647,15 @@ function AdminView() {
     setAdminNotes(prev => prev.filter(n => n.id !== id));
   };
 
-  const Tab = ({ id, label }) => (
+  const Tab = ({ id, label, badge }) => (
     <button onClick={() => setTab(id)}
-      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === id ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+      className={`relative px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === id ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
       {label}
+      {badge > 0 && (
+        <span className="ml-1.5 inline-flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1">
+          {badge}
+        </span>
+      )}
     </button>
   );
 
@@ -584,7 +671,7 @@ function AdminView() {
 
       <div className="flex border-b border-gray-200 gap-1">
         <Tab id="access"  label="Vehicle Access" />
-        <Tab id="logs"    label="Work Logs" />
+        <Tab id="logs"    label="Work Logs" badge={unreadCount} />
         <Tab id="history" label="Vehicle History" />
         <Tab id="notes"   label="Vehicle Notes" />
       </div>
@@ -750,35 +837,38 @@ function AdminView() {
             </div>
           </div>
 
-          {histSearched && !histLoading && (
-            histLogs.length === 0 ? (
-              <div className="card p-10 text-center text-gray-400">
-                No work logs found for {vehicles.find(v => v.devIdno === histVehicle)?.plate || histVehicle}.
-              </div>
-            ) : (
+          {histSearched && !histLoading && (() => {
+            const timeline = mergeTimeline(histLogs, histNotes);
+            const plate = vehicles.find(v => v.devIdno === histVehicle)?.plate || histVehicle;
+            if (timeline.length === 0) return (
+              <div className="card p-10 text-center text-gray-400">No history found for {plate}.</div>
+            );
+            return (
               <div className="space-y-3">
                 <p className="text-xs text-gray-500 font-medium">
-                  {histLogs.length} log{histLogs.length !== 1 ? 's' : ''} for {vehicles.find(v => v.devIdno === histVehicle)?.plate}
+                  {histLogs.length} log{histLogs.length !== 1 ? 's' : ''}, {histNotes.length} note{histNotes.length !== 1 ? 's' : ''} — {plate}
                 </p>
-                {histLogs.map(l => (
-                  <div key={l.id} className="card p-4">
+                {timeline.map(item => item._type === 'note' ? (
+                  <NoteTimelineCard key={`n-${item.id}`} note={item} isNew={false} />
+                ) : (
+                  <div key={`l-${item.id}`} className="card p-4">
                     <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <span className="text-xs font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-full">
-                        {fmtDate(l.log_date)}
+                        {fmtDate(item.log_date)}
                       </span>
-                      <span className="text-xs text-gray-400">{fmtTs(l.recorded_at)}</span>
-                      <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">🔧 {l.mechanic_name}</span>
+                      <span className="text-xs text-gray-400">{fmtTs(item.recorded_at)}</span>
+                      <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">🔧 {item.mechanic_name}</span>
                     </div>
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{l.note}</p>
-                    {l.attachments?.length > 0 && (
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{item.note}</p>
+                    {item.attachments?.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-gray-100">
-                        <p className="text-xs text-gray-400 mb-2">📎 {l.attachments.length} attachment{l.attachments.length !== 1 ? 's' : ''}</p>
+                        <p className="text-xs text-gray-400 mb-2">📎 {item.attachments.length} attachment{item.attachments.length !== 1 ? 's' : ''}</p>
                         <div className="flex flex-wrap gap-2">
-                          {l.attachments.map(a => (
-                            <a key={a.id} href={`/uploads/mechanic/${l.id}/${a.filename}`} target="_blank" rel="noreferrer"
+                          {item.attachments.map(a => (
+                            <a key={a.id} href={`/uploads/mechanic/${item.id}/${a.filename}`} target="_blank" rel="noreferrer"
                               className="group flex flex-col items-center gap-1">
                               {isImage(a.mime_type) ? (
-                                <img src={`/uploads/mechanic/${l.id}/${a.filename}`} alt={a.original_name}
+                                <img src={`/uploads/mechanic/${item.id}/${a.filename}`} alt={a.original_name}
                                   className="w-20 h-20 object-cover rounded-lg border border-gray-200 group-hover:opacity-80 transition-opacity" />
                               ) : (
                                 <div className="w-20 h-20 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-2xl">📄</div>
@@ -792,8 +882,8 @@ function AdminView() {
                   </div>
                 ))}
               </div>
-            )
-          )}
+            );
+          })()}
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import DriversList from './pages/DriversList';
@@ -11,6 +11,8 @@ import ReportEditor from './pages/ReportEditor';
 import ReportTemplates from './pages/ReportTemplates';
 import Layout from './components/Layout';
 import MechanicPortal from './pages/MechanicPortal';
+import api from './api/client';
+import toast from 'react-hot-toast';
 import TrackingPortal, {
   TrackingDailyReport,
   TrackingFuelAlerts,
