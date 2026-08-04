@@ -179,6 +179,15 @@ exports.adminDeleteNote = async (req, res) => {
   } catch (e) { err(res, e.message, 500); }
 };
 
+exports.adminEditNote = async (req, res) => {
+  try {
+    const { note } = req.body;
+    if (!note?.trim()) return err(res, 'Note text is required');
+    await M.updateAdminNote(req.params.id, note.trim());
+    ok(res, { updated: true });
+  } catch (e) { err(res, e.message, 500); }
+};
+
 // ── Admin: unread logs count ──────────────────────────────────────────────────
 
 exports.adminUnreadCount = async (req, res) => {

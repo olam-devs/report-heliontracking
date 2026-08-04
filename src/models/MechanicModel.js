@@ -195,6 +195,10 @@ exports.deleteAdminNote = async (id) => {
   await db.query('DELETE FROM mechanic_admin_notes WHERE id = ?', [id]);
 };
 
+exports.updateAdminNote = async (id, note) => {
+  await db.query('UPDATE mechanic_admin_notes SET note = ? WHERE id = ?', [note, id]);
+};
+
 exports.getAdminNotes = async (devIdno) => {
   const [rows] = await db.query(
     `SELECT mn.*, u.name AS created_by_name

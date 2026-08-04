@@ -90,16 +90,52 @@ function LogCard({ log, isToday }) {
 }
 
 // ── Admin note in timeline ───────────────────────────────────────────────────
-function NoteTimelineCard({ note, isNew }) {
+function NoteTimelineCard({ note, isNew, onEdit, onDelete }) {
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(note.note);
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!editText.trim()) return;
+    setSaving(true);
+    try {
+      await api.put(`/mechanic/admin/notes/${note.id}`, { note: editText.trim() });
+      onEdit?.(note.id, editText.trim());
+      setEditing(false);
+    } catch { } finally { setSaving(false); }
+  };
+
   return (
     <div className={`rounded-2xl border-2 p-4 ${isNew ? 'border-amber-400 bg-amber-50' : 'border-amber-200 bg-amber-50/60'}`}>
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         <span className="text-xs font-bold uppercase tracking-wide text-amber-700">📋 Supervisor Note</span>
         {isNew && <span className="text-[10px] font-bold bg-amber-400 text-white px-2 py-0.5 rounded-full uppercase">New</span>}
-        <span className="text-xs text-amber-600 ml-auto">{fmtTs(note.created_at)}</span>
+        <span className="text-xs text-amber-600">{fmtTs(note.created_at)}</span>
+        {(onEdit || onDelete) && !editing && (
+          <div className="ml-auto flex gap-2">
+            <button onClick={() => { setEditText(note.note); setEditing(true); }}
+              className="text-xs text-amber-700 font-semibold hover:underline">Edit</button>
+            <button onClick={() => onDelete?.(note.id)}
+              className="text-xs text-red-400 font-semibold hover:underline">Delete</button>
+          </div>
+        )}
       </div>
-      {note.created_by_name && <p className="text-xs text-amber-700 mb-1">by {note.created_by_name}</p>}
-      <p className="text-sm text-amber-900 whitespace-pre-wrap break-words leading-relaxed">{note.note}</p>
+      {note.created_by_name && <p className="text-xs text-amber-700 mb-2">by {note.created_by_name}</p>}
+      {editing ? (
+        <div className="space-y-2">
+          <textarea value={editText} onChange={e => setEditText(e.target.value)} rows={3}
+            className="input w-full resize-none text-sm" style={{ fontSize: '16px' }} />
+          <div className="flex gap-2">
+            <button onClick={save} disabled={saving || !editText.trim()}
+              className="btn btn-primary text-xs py-1.5 px-4 disabled:opacity-40">
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button onClick={() => setEditing(false)} className="text-xs text-gray-500 px-3">Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-amber-900 whitespace-pre-wrap break-words leading-relaxed">{note.note}</p>
+      )}
     </div>
   );
 }
@@ -682,6 +718,13 @@ function AdminView() {
   const deleteNote = async (id) => {
     await api.delete(`/mechanic/admin/notes/${id}`).catch(() => {});
     setAdminNotes(prev => prev.filter(n => n.id !== id));
+    setHistNotes(prev => prev.filter(n => n.id !== id));
+  };
+
+  const editNote = (id, newText) => {
+    const patch = n => n.id === id ? { ...n, note: newText } : n;
+    setAdminNotes(prev => prev.map(patch));
+    setHistNotes(prev => prev.map(patch));
   };
 
   const Tab = ({ id, label, badge }) => (
@@ -944,7 +987,7 @@ function AdminView() {
                   {histLogs.length} log{histLogs.length !== 1 ? 's' : ''}, {histNotes.length} note{histNotes.length !== 1 ? 's' : ''} — {plate}
                 </p>
                 {timeline.map(item => item._type === 'note' ? (
-                  <NoteTimelineCard key={`n-${item.id}`} note={item} isNew={false} />
+                  <NoteTimelineCard key={`n-${item.id}`} note={item} isNew={false} onEdit={editNote} onDelete={deleteNote} />
                 ) : (
                   <div key={`l-${item.id}`} className="card p-4">
                     <div className="flex items-center gap-3 mb-2 flex-wrap">

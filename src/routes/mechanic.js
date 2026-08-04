@@ -34,6 +34,7 @@ router.get('/admin/logs',                 requireAdmin, c.adminLogs);
 router.get('/admin/vehicle-history',      requireAdmin, c.adminVehicleHistory);
 router.get('/admin/notes',                requireAdmin, c.adminAllNotes);
 router.post('/admin/notes',               requireAdmin, c.adminAddNote);
+router.put('/admin/notes/:id',            requireAdmin, c.adminEditNote);
 router.delete('/admin/notes/:id',         requireAdmin, c.adminDeleteNote);
 
 module.exports = router;
