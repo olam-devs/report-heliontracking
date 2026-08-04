@@ -660,17 +660,18 @@ function AdminView() {
                 <input type="date" className="input" value={logDateFrom}
                   onChange={e => {
                     setLogDateFrom(e.target.value);
-                    // Auto-cap to_date to max 7 days
-                    const max = new Date(new Date(e.target.value).getTime() + 6 * 86400000).toISOString().slice(0,10);
-                    if (logDateTo > max) setLogDateTo(max);
-                    if (logDateTo < e.target.value) setLogDateTo(e.target.value);
+                    if (e.target.value && logDateTo) {
+                      const max = new Date(new Date(e.target.value).getTime() + 6 * 86400000).toISOString().slice(0,10);
+                      if (logDateTo > max) setLogDateTo(max);
+                      if (logDateTo < e.target.value) setLogDateTo(e.target.value);
+                    }
                   }} />
               </div>
               <div>
                 <label className="label">To date <span className="text-gray-400 font-normal">(max 7 days)</span></label>
                 <input type="date" className="input" value={logDateTo}
-                  min={logDateFrom}
-                  max={new Date(new Date(logDateFrom).getTime() + 6 * 86400000).toISOString().slice(0,10)}
+                  min={logDateFrom || ''}
+                  max={logDateFrom ? new Date(new Date(logDateFrom).getTime() + 6 * 86400000).toISOString().slice(0,10) : ''}
                   onChange={e => setLogDateTo(e.target.value)} />
               </div>
             </div>
