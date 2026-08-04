@@ -448,6 +448,8 @@ function AdminView() {
   const [vehicles, setVehicles] = useState([]);
   const [grants, setGrants] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState('');
   const [adminNotes, setAdminNotes] = useState([]);
 
   // Grant form
@@ -488,13 +490,21 @@ function AdminView() {
   };
 
   const loadLogs = async () => {
+    setLogsLoading(true);
+    setLogsError('');
     try {
       const params = { date_from: logDateFrom, date_to: logDateTo };
       if (logMechanic) params.mechanic_user_id = logMechanic;
       if (logVehicle) params.devIdno = logVehicle;
       const r = await api.get('/mechanic/admin/logs', { params });
       setLogs(r.data.data || []);
-    } catch {}
+    } catch (e) {
+      const msg = e.response?.data?.error || e.message || 'Failed to load logs';
+      setLogsError(msg);
+      toast.error(msg);
+    } finally {
+      setLogsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -674,8 +684,12 @@ function AdminView() {
             <button onClick={loadLogs} className="btn btn-primary w-full">🔍 Search Logs</button>
           </div>
 
-          {logs.length === 0 ? (
-            <div className="card p-10 text-center text-gray-400">No work logs for the selected filter.</div>
+          {logsLoading ? (
+            <div className="card p-10 text-center text-gray-400">Loading…</div>
+          ) : logsError ? (
+            <div className="card p-6 text-center text-red-500 text-sm">{logsError}</div>
+          ) : logs.length === 0 ? (
+            <div className="card p-10 text-center text-gray-400">No work logs found for this date range.</div>
           ) : (
             <div className="space-y-3">
               {logs.map(l => (
