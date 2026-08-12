@@ -7,6 +7,7 @@ echo [2/6] Copying backend files...
 copy "src\controllers\mechanicController.js" "C:\helion\fleet-incident-reporter\src\controllers\mechanicController.js" /Y
 copy "src\routes\mechanic.js" "C:\helion\fleet-incident-reporter\src\routes\mechanic.js" /Y
 copy "src\models\MechanicModel.js" "C:\helion\fleet-incident-reporter\src\models\MechanicModel.js" /Y
+copy "src\middleware\upload.js" "C:\helion\fleet-incident-reporter\src\middleware\upload.js" /Y
 copy "src\middleware\uploadMechanic.js" "C:\helion\fleet-incident-reporter\src\middleware\uploadMechanic.js" /Y
 copy "src\config\db.js" "C:\helion\fleet-incident-reporter\src\config\db.js" /Y
 copy "server.js" "C:\helion\fleet-incident-reporter\server.js" /Y
