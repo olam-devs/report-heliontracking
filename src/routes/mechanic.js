@@ -16,7 +16,17 @@ router.get('/my-vehicles',                requireMechanic, c.myVehicles);
 router.get('/all-vehicles',               requireMechanic, c.allVehicles);
 router.get('/vehicle-status/:devIdno',    requireMechanic, c.vehicleStatus);
 router.post('/logs',                      requireMechanic, c.addLog);
-router.post('/logs/:logId/attachments',   requireMechanic, upload.single('file'), c.addAttachment);
+router.post('/logs/:logId/attachments', requireMechanic, (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE'
+        ? `File too large — maximum is 200 MB`
+        : err.message || 'Upload failed';
+      return res.status(413).json({ success: false, error: msg });
+    }
+    next();
+  });
+}, c.addAttachment);
 router.get('/my-logs',                    requireMechanic, c.myLogs);
 router.get('/my-worked-vehicles',         requireMechanic, c.myWorkedVehicles);
 router.get('/my-all-notes',               requireMechanic, c.myAllNotes);

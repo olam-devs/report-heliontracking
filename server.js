@@ -58,6 +58,12 @@ if (isProd && fs.existsSync(path.join(clientDist, 'index.html'))) {
   });
 }
 
+// Allow up to 10 minutes for large file uploads (200 MB video)
+app.use((req, res, next) => {
+  if (req.path.includes('/attachments')) res.setTimeout(10 * 60 * 1000);
+  next();
+});
+
 app.listen(PORT, () => {
   console.log(`Fleet Incident Reporter  →  http://localhost:${PORT} (${isProd ? 'production' : 'development'})`);
   setImmediate(() => {
