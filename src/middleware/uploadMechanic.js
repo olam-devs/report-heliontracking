@@ -13,7 +13,7 @@ const storage = multer.diskStorage({
   },
 });
 
-const maxBytes = (parseInt(process.env.MAX_FILE_SIZE_MB) || 50) * 1024 * 1024;
+const maxBytes = (parseInt(process.env.MAX_FILE_SIZE_MB) || 200) * 1024 * 1024;
 
 module.exports = multer({
   storage,
