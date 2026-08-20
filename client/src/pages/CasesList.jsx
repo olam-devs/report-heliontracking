@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const STATUS_OPTIONS = [
   { value: 'ongoing',   label: 'Ongoing' },
@@ -88,10 +89,89 @@ function NewCaseModal({ onClose, onCreate }) {
   );
 }
 
+function HearingModal({ caseId, current, onClose, onSaved }) {
+  const [dateVal, setDateVal] = useState(current ? current.split('T')[0] : '');
+  const [saving, setSaving] = useState(false);
+
+  const save = async (e) => {
+    e.stopPropagation();
+    if (!dateVal) return;
+    setSaving(true);
+    try {
+      await api.put(`/cases/${caseId}/hearing`, { hearing_date: dateVal });
+      onSaved(caseId, dateVal);
+      toast.success('Hearing date saved');
+      onClose();
+    } catch { toast.error('Failed to save'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl p-5 w-72" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-800 text-sm">Set Hearing Date</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+        </div>
+        <input type="date" value={dateVal} onChange={e => setDateVal(e.target.value)}
+          className="input w-full mb-3" autoFocus />
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="btn btn-secondary text-xs">Cancel</button>
+          <button onClick={save} disabled={saving || !dateVal} className="btn btn-primary text-xs">
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HearingCell({ c, canManage, onOpenModal }) {
+  if (c.status !== 'completed') return <span className="text-gray-300 text-xs">—</span>;
+
+  const stop = (e) => e.stopPropagation();
+
+  if (!c.hearing_date) {
+    return (
+      <button
+        onClick={(e) => { stop(e); onOpenModal(c); }}
+        className="text-xs px-2 py-1 rounded-lg border border-dashed border-amber-400 text-amber-600 hover:bg-amber-50 whitespace-nowrap font-medium"
+      >
+        + Set date
+      </button>
+    );
+  }
+
+  const days = Math.round((new Date(c.hearing_date) - new Date(new Date().toDateString())) / 86400000);
+  const isPast = days < 0;
+  const label = isPast ? 'Passed' : days === 0 ? 'Today!' : days === 1 ? 'Tomorrow' : `${days}d left`;
+  const color = isPast ? 'text-gray-400' : days <= 1 ? 'text-red-600 font-bold' : days <= 3 ? 'text-orange-600 font-semibold' : 'text-amber-700 font-medium';
+
+  return (
+    <div className="flex items-center gap-1.5" onClick={stop}>
+      <span className={`text-xs whitespace-nowrap ${color}`}>{label}</span>
+      {canManage && (
+        <button
+          onClick={(e) => { stop(e); onOpenModal(c); }}
+          className="text-gray-400 hover:text-brand-600 shrink-0"
+          title="Edit hearing date"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function CasesList() {
+  const { user } = useAuth();
+  const canManage = user?.role === 'admin' || user?.role === 'hr';
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
+  const [hearingModal, setHearingModal] = useState(null);
   const [filters, setFilters] = useState({ status: '', severity: '', search: '' });
   const navigate = useNavigate();
 
@@ -169,7 +249,7 @@ export default function CasesList() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {['Case ID', 'Title', 'Vehicle', 'Driver', 'Date', 'Status', 'Severity', ''].map(h => (
+                {['Case ID', 'Title', 'Vehicle', 'Driver', 'Date', 'Status', 'Severity', 'Hearing', ''].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -191,6 +271,20 @@ export default function CasesList() {
                     <span className={`badge-${c.severity}`}>{SEVERITY_LABELS[c.severity]}</span>
                   </td>
                   <td className="px-4 py-3">
+                    {canManage
+                      ? <HearingCell c={c} canManage={canManage} onOpenModal={setHearingModal} />
+                      : c.hearing_date && c.status === 'completed'
+                        ? (() => {
+                            const days = Math.round((new Date(c.hearing_date) - new Date(new Date().toDateString())) / 86400000);
+                            const isPast = days < 0;
+                            const label = isPast ? 'Passed' : days === 0 ? 'Today!' : days === 1 ? 'Tomorrow' : `${days}d left`;
+                            const color = isPast ? 'text-gray-400' : days <= 1 ? 'text-red-600 font-bold' : days <= 3 ? 'text-orange-600 font-semibold' : 'text-amber-700 font-medium';
+                            return <span className={`text-xs ${color}`}>{label}</span>;
+                          })()
+                        : <span className="text-gray-300 text-xs">—</span>
+                    }
+                  </td>
+                  <td className="px-4 py-3">
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
@@ -203,6 +297,14 @@ export default function CasesList() {
       </div>
 
       {showNew && <NewCaseModal onClose={() => setShowNew(false)} onCreate={(c) => navigate(`/cases/${c.id}`)} />}
+      {hearingModal && (
+        <HearingModal
+          caseId={hearingModal.id}
+          current={hearingModal.hearing_date}
+          onClose={() => setHearingModal(null)}
+          onSaved={(id, date) => setCases(prev => prev.map(c => c.id === id ? { ...c, hearing_date: date } : c))}
+        />
+      )}
     </div>
   );
 }

@@ -23,12 +23,11 @@ copy "client\src\App.jsx" "C:\helion\fleet-incident-reporter\client\src\App.jsx"
 copy "client\src\components\Layout.jsx" "C:\helion\fleet-incident-reporter\client\src\components\Layout.jsx" /Y
 copy "client\src\pages\MechanicPortal.jsx" "C:\helion\fleet-incident-reporter\client\src\pages\MechanicPortal.jsx" /Y
 copy "client\src\pages\CaseDetail.jsx" "C:\helion\fleet-incident-reporter\client\src\pages\CaseDetail.jsx" /Y
+copy "client\src\pages\CasesList.jsx" "C:\helion\fleet-incident-reporter\client\src\pages\CasesList.jsx" /Y
 copy "client\src\pages\Users.jsx" "C:\helion\fleet-incident-reporter\client\src\pages\Users.jsx" /Y
 copy "client\src\components\EvidenceBlock.jsx" "C:\helion\fleet-incident-reporter\client\src\components\EvidenceBlock.jsx" /Y
 copy "client\src\components\StepBlock.jsx" "C:\helion\fleet-incident-reporter\client\src\components\StepBlock.jsx" /Y
 copy "client\src\components\HearingBanner.jsx" "C:\helion\fleet-incident-reporter\client\src\components\HearingBanner.jsx" /Y
-copy "client\src\App.jsx" "C:\helion\fleet-incident-reporter\client\src\App.jsx" /Y
-copy "client\src\pages\CaseDetail.jsx" "C:\helion\fleet-incident-reporter\client\src\pages\CaseDetail.jsx" /Y
 
 echo [4/6] Building frontend...
 cd C:\helion\fleet-incident-reporter\client
