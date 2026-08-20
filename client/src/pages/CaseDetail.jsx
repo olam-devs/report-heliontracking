@@ -52,7 +52,80 @@ function StatCard({ icon, label, value, sub }) {
 
 // ────── View Mode ─────────────────────────────────────────────────────────────
 
-function ViewMode({ caseData, steps, setSteps, linkedDrivers, generalEvidence, setGeneralEvidence, onEdit, canEdit, id, handleDownload, handleUnlinkDriver, handleLinkDriver, availableDrivers, templates, applyTemplate }) {
+function HearingPanel({ caseId, hearingDate, hearingNotes, onUpdated }) {
+  const { user } = useAuth();
+  const canManage = user?.role === 'admin' || user?.role === 'hr';
+  const [editing, setEditing] = useState(false);
+  const [dateVal, setDateVal] = useState('');
+  const [notesVal, setNotesVal] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = () => {
+    setDateVal(hearingDate ? hearingDate.split('T')[0] : '');
+    setNotesVal(hearingNotes || '');
+    setEditing(true);
+  };
+
+  const save = async () => {
+    if (!dateVal) return;
+    setSaving(true);
+    try {
+      await api.put(`/cases/${caseId}/hearing`, { hearing_date: dateVal, hearing_notes: notesVal });
+      onUpdated({ hearing_date: dateVal, hearing_notes: notesVal });
+      setEditing(false);
+      toast.success('Hearing date saved');
+    } catch { toast.error('Failed to save hearing date'); }
+    finally { setSaving(false); }
+  };
+
+  const remove = async () => {
+    setSaving(true);
+    try {
+      await api.delete(`/cases/${caseId}/hearing`);
+      onUpdated({ hearing_date: null, hearing_notes: null });
+      setEditing(false);
+      toast.success('Hearing date removed');
+    } catch { toast.error('Failed to remove hearing date'); }
+    finally { setSaving(false); }
+  };
+
+  const fmt = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
+  const isPast = hearingDate && new Date(hearingDate) < new Date(new Date().toDateString());
+
+  return (
+    <div className="mt-5 pt-4 border-t border-gray-100">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Hearing Date</h3>
+        {canManage && !editing && (
+          <button onClick={startEdit} className="text-xs text-brand-600 hover:underline">{hearingDate ? 'Edit' : 'Set'}</button>
+        )}
+      </div>
+      {editing ? (
+        <div className="space-y-2">
+          <input type="date" value={dateVal} onChange={e => setDateVal(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-brand-300 outline-none" />
+          <textarea value={notesVal} onChange={e => setNotesVal(e.target.value)} rows={2}
+            placeholder="Notes (optional)"
+            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs resize-none focus:ring-2 focus:ring-brand-300 outline-none" />
+          <div className="flex gap-1.5">
+            <button onClick={save} disabled={saving || !dateVal} className="btn btn-primary text-xs py-1 flex-1">{saving ? 'Saving…' : 'Save'}</button>
+            {hearingDate && <button onClick={remove} disabled={saving} className="btn btn-secondary text-xs py-1 text-red-600">Remove</button>}
+            <button onClick={() => setEditing(false)} className="btn btn-secondary text-xs py-1">Cancel</button>
+          </div>
+        </div>
+      ) : hearingDate ? (
+        <div className={`rounded-lg p-2.5 text-xs space-y-1 ${isPast ? 'bg-gray-50 text-gray-500' : 'bg-amber-50 text-amber-800'}`}>
+          <div className="font-semibold">{fmt(hearingDate)} {isPast ? '(passed)' : ''}</div>
+          {hearingNotes && <div className="text-gray-500 leading-relaxed">{hearingNotes}</div>}
+        </div>
+      ) : (
+        <p className="text-xs text-gray-400">No hearing scheduled</p>
+      )}
+    </div>
+  );
+}
+
+function ViewMode({ caseData, steps, setSteps, linkedDrivers, generalEvidence, setGeneralEvidence, onEdit, canEdit, id, handleDownload, handleUnlinkDriver, handleLinkDriver, availableDrivers, templates, applyTemplate, onHearingUpdated }) {
   const { user } = useAuth();
   const sc = STATUS_COLOR[caseData.status] || STATUS_COLOR.ongoing;
   const canDownload = user?.role === 'admin' || user?.can_download_evidence;
@@ -213,6 +286,14 @@ function ViewMode({ caseData, steps, setSteps, linkedDrivers, generalEvidence, s
               ))}
             </div>
           </div>
+
+          {/* Hearing date */}
+          <HearingPanel
+            caseId={id}
+            hearingDate={caseData.hearing_date}
+            hearingNotes={caseData.hearing_notes}
+            onUpdated={onHearingUpdated}
+          />
 
           {/* Created info */}
           {caseData.created_at && (
@@ -537,6 +618,7 @@ export default function CaseDetail() {
       caseData={{ ...caseData, ...meta }}
       canEdit={canEdit}
       onEdit={() => setMode('edit')}
+      onHearingUpdated={(fields) => setCaseData(c => ({ ...c, ...fields }))}
       setSteps={setSteps}
       setGeneralEvidence={setGeneralEvidence}
       handleLinkDriver={async (driverId) => {

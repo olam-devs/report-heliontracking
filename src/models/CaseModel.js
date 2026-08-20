@@ -116,3 +116,20 @@ exports.getLinkedDrivers = async (caseId) => {
   );
   return rows;
 };
+
+exports.setHearing = async (id, hearing_date, hearing_notes) => {
+  await db.query(
+    'UPDATE cases SET hearing_date = ?, hearing_notes = ? WHERE id = ?',
+    [hearing_date || null, hearing_notes || null, id]
+  );
+};
+
+exports.getUpcomingHearings = async () => {
+  const [rows] = await db.query(
+    `SELECT id, title, vehicle_plate, hearing_date, hearing_notes
+     FROM cases
+     WHERE hearing_date IS NOT NULL AND hearing_date >= CURDATE()
+     ORDER BY hearing_date ASC`
+  );
+  return rows;
+};

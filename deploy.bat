@@ -13,6 +13,10 @@ copy "src\config\db.js" "C:\helion\fleet-incident-reporter\src\config\db.js" /Y
 copy "server.js" "C:\helion\fleet-incident-reporter\server.js" /Y
 copy "run-migrate-v9.js" "C:\helion\fleet-incident-reporter\run-migrate-v9.js" /Y
 copy "run-migrate-v10.js" "C:\helion\fleet-incident-reporter\run-migrate-v10.js" /Y
+copy "run-migrate-v11.js" "C:\helion\fleet-incident-reporter\run-migrate-v11.js" /Y
+copy "src\controllers\casesController.js" "C:\helion\fleet-incident-reporter\src\controllers\casesController.js" /Y
+copy "src\models\CaseModel.js" "C:\helion\fleet-incident-reporter\src\models\CaseModel.js" /Y
+copy "src\routes\cases.js" "C:\helion\fleet-incident-reporter\src\routes\cases.js" /Y
 
 echo [3/6] Copying frontend files...
 copy "client\src\App.jsx" "C:\helion\fleet-incident-reporter\client\src\App.jsx" /Y
@@ -22,6 +26,9 @@ copy "client\src\pages\CaseDetail.jsx" "C:\helion\fleet-incident-reporter\client
 copy "client\src\pages\Users.jsx" "C:\helion\fleet-incident-reporter\client\src\pages\Users.jsx" /Y
 copy "client\src\components\EvidenceBlock.jsx" "C:\helion\fleet-incident-reporter\client\src\components\EvidenceBlock.jsx" /Y
 copy "client\src\components\StepBlock.jsx" "C:\helion\fleet-incident-reporter\client\src\components\StepBlock.jsx" /Y
+copy "client\src\components\HearingBanner.jsx" "C:\helion\fleet-incident-reporter\client\src\components\HearingBanner.jsx" /Y
+copy "client\src\App.jsx" "C:\helion\fleet-incident-reporter\client\src\App.jsx" /Y
+copy "client\src\pages\CaseDetail.jsx" "C:\helion\fleet-incident-reporter\client\src\pages\CaseDetail.jsx" /Y
 
 echo [4/6] Building frontend...
 cd C:\helion\fleet-incident-reporter\client

@@ -119,3 +119,37 @@ exports.unlinkDriver = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.setHearing = async (req, res) => {
+  try {
+    const role = req.user?.role;
+    if (role !== 'admin' && role !== 'hr') return res.status(403).json({ error: 'Admin or HR only' });
+    const { hearing_date, hearing_notes } = req.body;
+    if (!hearing_date) return res.status(400).json({ error: 'hearing_date is required' });
+    await CaseModel.setHearing(req.params.id, hearing_date, hearing_notes || null);
+    const updated = await CaseModel.findById(req.params.id);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.clearHearing = async (req, res) => {
+  try {
+    const role = req.user?.role;
+    if (role !== 'admin' && role !== 'hr') return res.status(403).json({ error: 'Admin or HR only' });
+    await CaseModel.setHearing(req.params.id, null, null);
+    res.json({ message: 'Hearing date removed' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.upcomingHearings = async (req, res) => {
+  try {
+    const rows = await CaseModel.getUpcomingHearings();
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
