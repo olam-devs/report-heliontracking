@@ -28,6 +28,7 @@ copy "client\src\pages\Users.jsx" "C:\helion\fleet-incident-reporter\client\src\
 copy "client\src\components\EvidenceBlock.jsx" "C:\helion\fleet-incident-reporter\client\src\components\EvidenceBlock.jsx" /Y
 copy "client\src\components\StepBlock.jsx" "C:\helion\fleet-incident-reporter\client\src\components\StepBlock.jsx" /Y
 copy "client\src\components\HearingBanner.jsx" "C:\helion\fleet-incident-reporter\client\src\components\HearingBanner.jsx" /Y
+copy "client\src\context\AuthContext.jsx" "C:\helion\fleet-incident-reporter\client\src\context\AuthContext.jsx" /Y
 
 echo [4/6] Building frontend...
 cd C:\helion\fleet-incident-reporter\client

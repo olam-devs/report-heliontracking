@@ -191,8 +191,16 @@ export default function CasesList() {
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [hearingModal, setHearingModal] = useState(null);
+  const [hearingPopup, setHearingPopup] = useState([]);
   const [filters, setFilters] = useState({ status: '', severity: '', search: '' });
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (sessionStorage.getItem('hearing_cases_shown')) return;
+    api.get('/cases/hearings/upcoming').then(r => {
+      if (r.data.length > 0) setHearingPopup(r.data);
+    }).catch(() => {});
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -314,6 +322,56 @@ export default function CasesList() {
           </table>
         )}
       </div>
+
+      {hearingPopup.length > 0 && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="bg-amber-500 px-6 py-4 flex items-center gap-3">
+              <svg className="w-5 h-5 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <h2 className="text-white font-bold text-sm">Upcoming Hearing{hearingPopup.length > 1 ? 's' : ''} ({hearingPopup.length})</h2>
+            </div>
+            <div className="px-6 py-4 space-y-2 max-h-72 overflow-y-auto">
+              {hearingPopup.map(h => {
+                const days = Math.round((new Date(h.hearing_date) - new Date(new Date().toDateString())) / 86400000);
+                const isPast = days < 0;
+                const label = isPast ? 'Passed' : days === 0 ? 'Today!' : days === 1 ? 'Tomorrow' : `In ${days} days`;
+                const color = isPast ? 'text-gray-400' : days <= 1 ? 'text-red-600 font-bold' : days <= 3 ? 'text-orange-600 font-semibold' : 'text-amber-700 font-medium';
+                const fmt = (d) => new Date(d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+                return (
+                  <div key={h.id} className="border border-amber-100 rounded-xl p-3 bg-amber-50">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <button
+                          onClick={() => { sessionStorage.setItem('hearing_cases_shown', '1'); setHearingPopup([]); navigate(`/cases/${h.id}`); }}
+                          className="text-sm font-semibold text-gray-800 hover:text-amber-700 hover:underline text-left truncate block max-w-[200px]"
+                        >
+                          {h.id} — {h.title}
+                        </button>
+                        {h.vehicle_plate && <div className="text-xs text-gray-500 mt-0.5">Vehicle: {h.vehicle_plate}</div>}
+                        {h.hearing_notes && <div className="text-xs text-gray-500 mt-1 leading-relaxed">{h.hearing_notes}</div>}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-xs text-gray-500">{fmt(h.hearing_date)}</div>
+                        <div className={`text-xs mt-0.5 ${color}`}>{label}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="px-6 py-3 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => { sessionStorage.setItem('hearing_cases_shown', '1'); setHearingPopup([]); }}
+                className="btn btn-primary text-sm"
+              >
+                OK, got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showNew && <NewCaseModal onClose={() => setShowNew(false)} onCreate={(c) => navigate(`/cases/${c.id}`)} />}
       {hearingModal && (

@@ -10,7 +10,6 @@ import Users from './pages/Users';
 import ReportEditor from './pages/ReportEditor';
 import ReportTemplates from './pages/ReportTemplates';
 import Layout from './components/Layout';
-import HearingBanner from './components/HearingBanner';
 import MechanicPortal from './pages/MechanicPortal';
 import api from './api/client';
 import toast from 'react-hot-toast';
@@ -82,7 +81,6 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <HearingBanner />
       <AppRoutes />
     </AuthProvider>
   );
