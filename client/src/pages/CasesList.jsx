@@ -106,20 +106,39 @@ function HearingModal({ caseId, current, onClose, onSaved }) {
     finally { setSaving(false); }
   };
 
+  const clear = async (e) => {
+    e.stopPropagation();
+    setSaving(true);
+    try {
+      await api.delete(`/cases/${caseId}/hearing`);
+      onSaved(caseId, null);
+      toast.success('Hearing date removed');
+      onClose();
+    } catch { toast.error('Failed to remove'); }
+    finally { setSaving(false); }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl p-5 w-72" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-800 text-sm">Set Hearing Date</h3>
+          <h3 className="font-semibold text-gray-800 text-sm">{current ? 'Edit Hearing Date' : 'Set Hearing Date'}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
         </div>
         <input type="date" value={dateVal} onChange={e => setDateVal(e.target.value)}
           className="input w-full mb-3" autoFocus />
-        <div className="flex gap-2 justify-end">
-          <button onClick={onClose} className="btn btn-secondary text-xs">Cancel</button>
-          <button onClick={save} disabled={saving || !dateVal} className="btn btn-primary text-xs">
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+        <div className="flex gap-2 justify-between">
+          {current && (
+            <button onClick={clear} disabled={saving} className="btn btn-secondary text-xs text-red-600 hover:bg-red-50">
+              Clear
+            </button>
+          )}
+          <div className="flex gap-2 ml-auto">
+            <button onClick={onClose} className="btn btn-secondary text-xs">Cancel</button>
+            <button onClick={save} disabled={saving || !dateVal} className="btn btn-primary text-xs">
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
