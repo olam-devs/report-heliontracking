@@ -448,6 +448,22 @@ export default function DailyReport({ readOnly = false }) {
     }
   };
 
+  const copyExpiredSims = () => {
+    const expired = (report?.rows || []).filter(
+      (r) => r.bundleDaysLeft != null && r.bundleDaysLeft <= 0 && r.sim,
+    );
+    if (!expired.length) return;
+    const text = expired.map((r) => r.sim).join("\n");
+    navigator.clipboard.writeText(text).then(() => {
+      // brief visual feedback via the browser
+    });
+  };
+
+  const expiredWithSim = useMemo(
+    () => (report?.rows || []).filter((r) => r.bundleDaysLeft != null && r.bundleDaysLeft <= 0 && r.sim),
+    [report?.rows],
+  );
+
   const exportCmsv = () => {
     const rows = visibleRows;
     if (!rows.length) return;
@@ -819,6 +835,19 @@ export default function DailyReport({ readOnly = false }) {
           <Btn onClick={exportCmsv} disabled={!visibleRows.length}>
             Export CMSV
           </Btn>
+          {expiredWithSim.length > 0 && (
+            <Btn
+              onClick={() => {
+                copyExpiredSims();
+                // Brief label swap to confirm copy
+                const btn = document.getElementById("copy-sim-btn");
+                if (btn) { btn.textContent = "Copied!"; setTimeout(() => { btn.textContent = `Copy expired SIMs (${expiredWithSim.length})`; }, 1500); }
+              }}
+              style={{ background: "#b91c1c" }}
+            >
+              <span id="copy-sim-btn">Copy expired SIMs ({expiredWithSim.length})</span>
+            </Btn>
+          )}
         </div>
         <div
           style={

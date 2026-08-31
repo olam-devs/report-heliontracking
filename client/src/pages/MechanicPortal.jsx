@@ -521,7 +521,7 @@ function MechanicView() {
                           className="w-full text-left px-4 py-3 hover:bg-brand-50 flex items-center justify-between border-b border-gray-100 last:border-0">
                           <span className="font-semibold text-gray-800">{v.plate}</span>
                           <div className="flex items-center gap-2">
-                            {pendingVehicles.find(p => p.devIdno === v.devIdno) && (
+                            {pendingVehicles.find(p => String(p.devIdno) === String(v.devIdno)) && (
                               <span className="text-xs bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full">⚠️ Pending</span>
                             )}
                             {Number(v.unread_notes) > 0 && (
@@ -561,16 +561,28 @@ function MechanicView() {
               if (histDateFrom) timeline = timeline.filter(i => String(i._ts).slice(0,10) >= histDateFrom);
               if (histDateTo)   timeline = timeline.filter(i => String(i._ts).slice(0,10) <= histDateTo);
               const plate = workedVehicles.find(v => v.devIdno === histVehicle)?.plate || histVehicle;
-              const isPending = !!pendingVehicles.find(p => p.devIdno === histVehicle);
+              const pendingEntry = pendingVehicles.find(p => String(p.devIdno) === String(histVehicle));
+              const isPending = !!pendingEntry;
               return (
                 <div className="space-y-3">
+                  {isPending && (
+                    <div className="bg-orange-50 border-2 border-orange-400 rounded-2xl px-4 py-3 flex items-start gap-3">
+                      <span className="text-xl mt-0.5">⚠️</span>
+                      <div>
+                        <p className="text-sm font-bold text-orange-800">This vehicle is marked pending</p>
+                        {pendingEntry.reason && (
+                          <p className="text-sm text-orange-700 mt-0.5">{pendingEntry.reason}</p>
+                        )}
+                        <p className="text-xs text-orange-500 mt-1">
+                          Flagged {pendingEntry.marked_by_name ? `by ${pendingEntry.marked_by_name}` : 'by supervisor'} · {fmtTs(pendingEntry.marked_at)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 px-1">
                     <p className="text-xs text-gray-400 font-medium">
                       {timeline.length} item{timeline.length !== 1 ? 's' : ''} — {plate}
                     </p>
-                    {isPending && (
-                      <span className="text-xs bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full">⚠️ Pending</span>
-                    )}
                   </div>
                   {timeline.length === 0 ? (
                     <div className="bg-white rounded-2xl p-6 text-center text-sm text-gray-400 shadow-sm">
@@ -697,6 +709,93 @@ function MechanicView() {
         )}
 
       </div>
+    </div>
+  );
+}
+
+// ── Admin: Pending Vehicles tab ──────────────────────────────────────────────
+function PendingAdminTab({ pendingVehicles, onUnmark, onEditReason }) {
+  const [editingId, setEditingId] = useState(null); // devIdno being edited
+  const [editDraft, setEditDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = (p) => { setEditingId(p.devIdno); setEditDraft(p.reason || ''); };
+  const cancelEdit = () => { setEditingId(null); setEditDraft(''); };
+
+  const saveEdit = async (devIdno) => {
+    setSaving(true);
+    await onEditReason(devIdno, editDraft);
+    setSaving(false);
+    setEditingId(null);
+    setEditDraft('');
+  };
+
+  if (pendingVehicles.length === 0) {
+    return (
+      <div className="card p-12 text-center text-gray-400 mt-2">
+        <div className="text-4xl mb-3">✅</div>
+        <p className="font-semibold text-gray-600">No pending vehicles</p>
+        <p className="text-sm mt-1">Mark a vehicle pending from the Vehicle History tab.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 mt-2">
+      <p className="text-xs text-gray-400 font-medium px-1">
+        {pendingVehicles.length} vehicle{pendingVehicles.length !== 1 ? 's' : ''} pending — visible to all mechanics
+      </p>
+      {pendingVehicles.map(p => (
+        <div key={p.devIdno} className="card p-4 border-orange-300 bg-orange-50 space-y-3">
+          <div className="flex items-start gap-3 flex-wrap">
+            <span className="text-xl mt-0.5 shrink-0">⚠️</span>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-gray-900 text-base">{p.plate || p.devIdno}</p>
+              {editingId === p.devIdno ? (
+                <div className="mt-2 space-y-2">
+                  <textarea
+                    value={editDraft}
+                    onChange={e => setEditDraft(e.target.value)}
+                    rows={2}
+                    placeholder="Pending reason (what needs to be done)…"
+                    className="input w-full resize-none text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={() => saveEdit(p.devIdno)} disabled={saving}
+                      className="btn btn-primary text-xs py-1.5 px-4 disabled:opacity-40">
+                      {saving ? 'Saving…' : 'Save reason'}
+                    </button>
+                    <button onClick={cancelEdit} className="text-xs text-gray-500 px-3">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {p.reason ? (
+                    <p className="text-sm text-orange-800 mt-0.5">{p.reason}</p>
+                  ) : (
+                    <p className="text-xs text-orange-400 italic mt-0.5">No reason set</p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1">
+                    Flagged {p.marked_by_name ? `by ${p.marked_by_name}` : ''} · {fmtTs(p.marked_at)}
+                  </p>
+                </>
+              )}
+            </div>
+            {editingId !== p.devIdno && (
+              <div className="flex flex-col gap-2 shrink-0">
+                <button onClick={() => startEdit(p)}
+                  className="btn text-xs py-1.5 px-3 bg-white text-orange-700 border-orange-300 hover:bg-orange-100">
+                  ✏️ Edit reason
+                </button>
+                <button onClick={() => onUnmark(p.devIdno)}
+                  className="btn text-xs py-1.5 px-3 bg-white text-green-700 border-green-300 hover:bg-green-50">
+                  ✓ Remove pending
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -841,10 +940,21 @@ function AdminView() {
 
   const handleUnmarkPending = async (devIdno) => {
     try {
-      await api.delete(`/mechanic/admin/pending/${devIdno}`);
+      await api.delete(`/mechanic/admin/pending/${encodeURIComponent(devIdno)}`);
       toast.success('Removed from pending');
+      // Optimistic update immediately, then re-fetch to confirm
+      setPendingVehicles(prev => prev.filter(p => String(p.devIdno) !== String(devIdno)));
       refreshPending();
-    } catch (e) { toast.error('Failed'); }
+    } catch (e) { toast.error('Failed to remove pending'); }
+  };
+
+  const handleEditPendingReason = async (devIdno, newReason) => {
+    const v = vehicles.find(x => String(x.devIdno) === String(devIdno));
+    try {
+      await api.post('/mechanic/admin/pending', { devIdno, plate: v?.plate || devIdno, reason: newReason.trim() || null });
+      toast.success('Pending reason updated');
+      refreshPending();
+    } catch (e) { toast.error('Failed to update reason'); }
   };
 
   const Tab = ({ id, label, badge }) => (
@@ -866,6 +976,7 @@ function AdminView() {
       <div className="flex border-b border-gray-200 gap-1 flex-wrap">
         <Tab id="logs"    label="Work Logs"      badge={unreadCount} />
         <Tab id="history" label="Vehicle History" />
+        <Tab id="pending" label="Pending Vehicles" badge={pendingVehicles.length} />
       </div>
 
       {/* ── Work Logs tab ── */}
@@ -983,6 +1094,15 @@ function AdminView() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Pending Vehicles tab ── */}
+      {tab === 'pending' && (
+        <PendingAdminTab
+          pendingVehicles={pendingVehicles}
+          onUnmark={handleUnmarkPending}
+          onEditReason={handleEditPendingReason}
+        />
       )}
 
       {/* ── Vehicle History tab ── */}
