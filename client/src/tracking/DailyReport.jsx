@@ -450,17 +450,15 @@ export default function DailyReport({ readOnly = false }) {
 
   const copyExpiredSims = () => {
     const expired = (report?.rows || []).filter(
-      (r) => r.bundleDaysLeft != null && r.bundleDaysLeft <= 0 && r.sim,
+      (r) => r.bundleDaysLeft != null && r.bundleDaysLeft <= BUNDLE_WARN_DAYS && r.sim,
     );
     if (!expired.length) return;
     const text = expired.map((r) => `${r.plate}\t${r.sim}`).join("\n");
-    navigator.clipboard.writeText(text).then(() => {
-      // brief visual feedback via the browser
-    });
+    navigator.clipboard.writeText(text).then(() => {});
   };
 
   const expiredWithSim = useMemo(
-    () => (report?.rows || []).filter((r) => r.bundleDaysLeft != null && r.bundleDaysLeft <= 0 && r.sim),
+    () => (report?.rows || []).filter((r) => r.bundleDaysLeft != null && r.bundleDaysLeft <= BUNDLE_WARN_DAYS && r.sim),
     [report?.rows],
   );
 
