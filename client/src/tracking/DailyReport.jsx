@@ -453,7 +453,10 @@ export default function DailyReport({ readOnly = false }) {
       (r) => r.bundleDaysLeft != null && r.bundleDaysLeft <= BUNDLE_WARN_DAYS && r.sim,
     );
     if (!expired.length) return;
-    const text = expired.map((r) => `${r.plate}\t${r.sim}`).join("\n");
+    const text = expired.map((r) => {
+      const bundle = r.bundleDaysLeft <= 0 ? "Expired" : `${r.bundleDaysLeft}d left`;
+      return `${r.plate}\t${r.sim}\t${bundle}`;
+    }).join("\n");
     navigator.clipboard.writeText(text).then(() => {});
   };
 
