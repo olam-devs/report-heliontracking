@@ -453,7 +453,7 @@ export default function DailyReport({ readOnly = false }) {
       (r) => r.bundleDaysLeft != null && r.bundleDaysLeft <= 0 && r.sim,
     );
     if (!expired.length) return;
-    const text = expired.map((r) => r.sim).join("\n");
+    const text = expired.map((r) => `${r.plate}\t${r.sim}`).join("\n");
     navigator.clipboard.writeText(text).then(() => {
       // brief visual feedback via the browser
     });
