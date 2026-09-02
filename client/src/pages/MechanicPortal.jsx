@@ -32,12 +32,30 @@ function agoLabel(ts) {
   return remHrs > 0 ? `${days}D ${remHrs}H` : `${days}D`;
 }
 
+// ── Fuel state classifier (mechanic view — no amounts) ───────────────────────
+// fuelHist: [{fuel, speed}] last 5 polls; wasStaleOnline: bool carried forward
+function classifyFuel(status, fuelHist, wasStaleOnline) {
+  if (!status) return null;
+  const fuel = status.fuel;
+  if (fuel == null) return null; // no sensor configured in CMSV
+  const online = (status.ol ?? status.online ?? 0) !== 0;
+  if (online) {
+    // stale = fuel unchanged across last 3+ polls while speed > 0
+    const movingPolls = fuelHist.filter(h => h.speed != null && h.speed >= 3);
+    const stale = movingPolls.length >= 3 &&
+      movingPolls.slice(-3).every(h => h.fuel === movingPolls[movingPolls.length - 3].fuel);
+    if (stale) return 'stale_driving';
+    return 'ok';
+  } else {
+    return wasStaleOnline ? 'offline_was_stale' : 'offline_ok';
+  }
+}
+
 // ── Status pill ──────────────────────────────────────────────────────────────
-function StatusRow({ status }) {
+function StatusRow({ status, fuelKind }) {
   if (!status) return <div className="text-xs text-gray-400 italic">Status unavailable</div>;
   const online = (status.ol ?? status.online ?? 0) !== 0;
   const acc = status.accOn;
-  const fuel = status.fuel;
   const gpsTime = status.gpsTime;
   const lat = status.lat;
   const lng = status.lng;
@@ -45,7 +63,35 @@ function StatusRow({ status }) {
   const mapsUrl = hasLocation ? `https://maps.google.com/?q=${lat},${lng}` : null;
   const lastSeen = !online && gpsTime ? agoLabel(gpsTime) : null;
   const lastSeenDate = !online && gpsTime ? fmtTs(gpsTime) : null;
-  const fuelStale = !online;
+
+  let fuelPill = null;
+  if (fuelKind === 'ok') {
+    fuelPill = (
+      <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 font-semibold">⛽ Sensor OK</span>
+    );
+  } else if (fuelKind === 'stale_driving') {
+    fuelPill = (
+      <span className="px-2 py-1 rounded-full bg-red-100 text-red-700 font-semibold border border-red-300"
+        title="Fuel sensor reading is not changing while the vehicle is moving — check sensor connection">
+        ⛽ ⚠ Sensor not responding — inspect connection
+      </span>
+    );
+  } else if (fuelKind === 'offline_ok') {
+    fuelPill = (
+      <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-600 font-semibold"
+        title={lastSeenDate ? `Vehicle last online: ${lastSeenDate}` : 'Vehicle offline'}>
+        ⛽ Was reading OK · offline {lastSeen || ''}
+      </span>
+    );
+  } else if (fuelKind === 'offline_was_stale') {
+    fuelPill = (
+      <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-700 font-semibold border border-orange-300"
+        title={lastSeenDate ? `Sensor was faulty before vehicle went offline at ${lastSeenDate}` : 'Sensor faulty before going offline'}>
+        ⛽ ⚠ Sensor was faulty before going offline — needs inspection
+      </span>
+    );
+  }
+
   return (
     <div className="flex flex-wrap gap-2 text-xs">
       <span className={`px-2 py-1 rounded-full font-semibold ${online ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
@@ -59,15 +105,7 @@ function StatusRow({ status }) {
       <span className={`px-2 py-1 rounded-full font-semibold ${acc ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
         ACC {acc ? 'ON' : 'OFF'}
       </span>
-      {fuel != null && (
-        fuelStale ? (
-          <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-700 font-semibold" title={gpsTime ? `Last reading: ${fmtTs(gpsTime)}` : 'Fuel reading stale'}>
-            ⛽ ⚠ Stale{lastSeen ? ` · ${lastSeen}` : ''}
-          </span>
-        ) : (
-          <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 font-semibold">⛽ Reading OK</span>
-        )
-      )}
+      {fuelPill}
       {mapsUrl && (
         <a href={mapsUrl} target="_blank" rel="noreferrer"
           className="px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 font-semibold flex items-center gap-1">
@@ -307,6 +345,9 @@ function MechanicView() {
   const [workVehicle, setWorkVehicle] = useState('');
   const [workStatus, setWorkStatus]   = useState(null);
   const [workLogs, setWorkLogs]       = useState([]);
+  const fuelHistRef     = useRef([]); // [{fuel, speed}] last 5 polls
+  const wasStaleRef     = useRef(false); // was sensor stale while online?
+  const [fuelKind, setFuelKind] = useState(null);
   const [workLogsLoading, setWorkLogsLoading] = useState(false);
 
   // History page
@@ -338,11 +379,26 @@ function MechanicView() {
 
   // Status polling for selected work vehicle
   useEffect(() => {
-    if (!workVehicle) { setWorkStatus(null); setWorkLogs([]); return; }
-    api.get(`/mechanic/vehicle-status/${workVehicle}`).then(r => setWorkStatus(r.data.data)).catch(() => {});
+    if (!workVehicle) { setWorkStatus(null); setWorkLogs([]); fuelHistRef.current = []; wasStaleRef.current = false; setFuelKind(null); return; }
+    const applyStatus = (s) => {
+      setWorkStatus(s);
+      if (!s) return;
+      const online = (s.ol ?? s.online ?? 0) !== 0;
+      const hist = fuelHistRef.current;
+      // Push new entry (keep last 5)
+      const next = [...hist.slice(-4), { fuel: s.fuel, speed: s.speed }];
+      fuelHistRef.current = next;
+      const kind = classifyFuel(s, next, wasStaleRef.current);
+      // While online, track whether sensor was stale
+      if (online) wasStaleRef.current = kind === 'stale_driving';
+      setFuelKind(kind);
+    };
+    fuelHistRef.current = [];
+    wasStaleRef.current = false;
+    api.get(`/mechanic/vehicle-status/${workVehicle}`).then(r => applyStatus(r.data.data)).catch(() => {});
     loadWorkLogs(workVehicle);
     const iv = setInterval(() => {
-      api.get(`/mechanic/vehicle-status/${workVehicle}`).then(r => setWorkStatus(r.data.data)).catch(() => {});
+      api.get(`/mechanic/vehicle-status/${workVehicle}`).then(r => applyStatus(r.data.data)).catch(() => {});
     }, 8000);
     return () => clearInterval(iv);
   }, [workVehicle]);
@@ -483,7 +539,7 @@ function MechanicView() {
                   <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
                     Live status — {workVehicleInfo?.plate || workVehicle}
                   </p>
-                  <StatusRow status={workStatus} />
+                  <StatusRow status={workStatus} fuelKind={fuelKind} />
                 </div>
 
                 <AddLogForm

@@ -33,68 +33,64 @@ const BUNDLE_WARN_DAYS = 5;
 function FuelCell({ row }) {
   const fd = row.fuelDisplay;
   const gd = row.gprsDisplay;
+  const ad = row.antennaDisplay;
   const litres = fd?.litres;
+  const online = ad?.online !== false; // treat unknown as online
   const moving = gd?.moving === true;
-  // Sensor tamper: car is moving but fuel reading is stale (>2h old by default)
-  const sensorTampered = moving && fd?.stale;
-  const sensorError = fd?.status === "error";
-  const sensorWarn = fd?.status === "warn";
-  const hasReading = litres != null && litres > 0;
+  const hasReading = litres != null;
 
-  if (sensorTampered) {
-    // Car driving but fuel sensor not updating — show persistent alert
-    return (
-      <td
-        style={{
-          padding: "6px 8px",
-          fontSize: 11,
-          background: "#fee2e2",
-          border: "2px solid #ef4444",
-          borderRadius: 4,
-          whiteSpace: "nowrap",
-          minWidth: 80,
-        }}
-      >
-        <div style={{ fontWeight: 800, color: "#b91c1c", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
-          ⚠ Sensor alert
-        </div>
-        <div style={{ color: "#7f1d1d", fontSize: 10 }}>
-          {hasReading ? `Last: ${litres}L` : "No reading"}
-        </div>
-        <div style={{ color: "#991b1b", fontSize: 9 }}>
-          Frozen {fd?.ageLabel || "?"} · car moving
-        </div>
-      </td>
-    );
-  }
-
-  if (!hasReading && fd?.status === "none") {
+  // No sensor configured
+  if (fd?.status === "none" || (!hasReading && !fd?.stale)) {
     return (
       <td style={{ padding: "6px 8px", fontSize: 11, color: "#9ca3af" }}>—</td>
     );
   }
 
-  const bg = sensorError ? "#fecaca" : sensorWarn ? "#fef3c7" : undefined;
-  const color = sensorError ? "#7f1d1d" : sensorWarn ? "#78350f" : undefined;
+  // Online + moving + stale → sensor not updating while driving
+  const sensorTampered = online && moving && fd?.stale;
+  if (sensorTampered) {
+    return (
+      <td style={{ padding: "6px 8px", fontSize: 11, background: "#fee2e2", border: "2px solid #ef4444", borderRadius: 4, whiteSpace: "nowrap", minWidth: 80 }}>
+        <div style={{ fontWeight: 800, color: "#b91c1c", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>⚠ Sensor alert</div>
+        <div style={{ color: "#7f1d1d", fontSize: 10 }}>{hasReading ? `Last: ${litres}L` : "No reading"}</div>
+        <div style={{ color: "#991b1b", fontSize: 9 }}>Frozen {fd?.ageLabel || "?"} · car moving</div>
+      </td>
+    );
+  }
 
+  // Offline + stale (sensor was already faulty before going offline)
+  if (!online && fd?.stale) {
+    return (
+      <td style={{ padding: "6px 8px", fontSize: 11, background: "#ffedd5", border: "1px solid #f97316", borderRadius: 4, whiteSpace: "nowrap", minWidth: 80 }}>
+        <div style={{ fontWeight: 700, color: "#9a3412", fontSize: 10 }}>⚠ Stale · offline</div>
+        <div style={{ color: "#7c2d12", fontSize: 10 }}>{hasReading ? `Last: ${litres}L` : "No reading"}</div>
+        <div style={{ color: "#9a3412", fontSize: 9 }}>Sensor faulty before offline</div>
+      </td>
+    );
+  }
+
+  // Offline + last reading was OK (show last known value with offline note)
+  if (!online && hasReading) {
+    return (
+      <td style={{ padding: "6px 8px", fontSize: 11, whiteSpace: "nowrap", minWidth: 70 }}>
+        <div style={{ fontWeight: 700 }}>{litres}L</div>
+        <div style={{ fontSize: 9, color: "#6b7280" }}>last · {fd?.ageLabel || "?"} ago</div>
+      </td>
+    );
+  }
+
+  // Online — normal display
+  const sensorError = fd?.status === "error";
+  const sensorWarn  = fd?.status === "warn";
+  const bg    = sensorError ? "#fecaca" : sensorWarn ? "#fef3c7" : undefined;
+  const color = sensorError ? "#7f1d1d" : sensorWarn ? "#78350f" : undefined;
   return (
-    <td
-      style={{
-        padding: "6px 8px",
-        fontSize: 11,
-        background: bg,
-        color,
-        whiteSpace: "nowrap",
-        minWidth: 70,
-      }}
-    >
+    <td style={{ padding: "6px 8px", fontSize: 11, background: bg, color, whiteSpace: "nowrap", minWidth: 70 }}>
       {hasReading ? (
         <>
           <div style={{ fontWeight: 700 }}>{litres}L</div>
           {(sensorWarn || sensorError) && (
-            <div style={{ fontSize: 9, opacity: 0.85 }}>
-              {sensorError ? "⚠ stale " : "~"}{fd?.ageLabel || ""}
-            </div>
+            <div style={{ fontSize: 9, opacity: 0.85 }}>{sensorError ? "⚠ stale " : "~"}{fd?.ageLabel || ""}</div>
           )}
         </>
       ) : (
