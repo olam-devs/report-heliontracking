@@ -17,26 +17,56 @@ const fmtDate = (s) => {
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const isImage = (mime) => mime?.startsWith('image/');
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function agoLabel(ts) {
+  if (!ts) return null;
+  const secs = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+  if (secs < 60) return `${secs}S`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}M`;
+  const hrs = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (hrs < 24) return remMins > 0 ? `${hrs}H ${remMins}M` : `${hrs}H`;
+  const days = Math.floor(hrs / 24);
+  const remHrs = hrs % 24;
+  return remHrs > 0 ? `${days}D ${remHrs}H` : `${days}D`;
+}
+
 // ── Status pill ──────────────────────────────────────────────────────────────
 function StatusRow({ status }) {
   if (!status) return <div className="text-xs text-gray-400 italic">Status unavailable</div>;
   const online = (status.ol ?? status.online ?? 0) !== 0;
   const acc = status.accOn;
   const fuel = status.fuel;
+  const gpsTime = status.gpsTime;
   const lat = status.lat;
   const lng = status.lng;
   const hasLocation = lat != null && lng != null && (lat !== 0 || lng !== 0);
   const mapsUrl = hasLocation ? `https://maps.google.com/?q=${lat},${lng}` : null;
+  const lastSeen = !online && gpsTime ? agoLabel(gpsTime) : null;
+  const lastSeenDate = !online && gpsTime ? fmtTs(gpsTime) : null;
+  const fuelStale = !online;
   return (
     <div className="flex flex-wrap gap-2 text-xs">
       <span className={`px-2 py-1 rounded-full font-semibold ${online ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
         {online ? '● Online' : '○ Offline'}
       </span>
+      {lastSeen && (
+        <span className="px-2 py-1 rounded-full bg-red-50 text-red-500 font-semibold" title={`Last seen: ${lastSeenDate}`}>
+          🕐 {lastSeen} ago
+        </span>
+      )}
       <span className={`px-2 py-1 rounded-full font-semibold ${acc ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
         ACC {acc ? 'ON' : 'OFF'}
       </span>
       {fuel != null && (
-        <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">⛽ {Math.round(fuel)}L</span>
+        fuelStale ? (
+          <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-700 font-semibold" title={gpsTime ? `Last reading: ${fmtTs(gpsTime)}` : 'Fuel reading stale'}>
+            ⛽ ⚠ Stale{lastSeen ? ` · ${lastSeen}` : ''}
+          </span>
+        ) : (
+          <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 font-semibold">⛽ Reading OK</span>
+        )
       )}
       {mapsUrl && (
         <a href={mapsUrl} target="_blank" rel="noreferrer"
