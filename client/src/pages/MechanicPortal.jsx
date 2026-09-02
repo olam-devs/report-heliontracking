@@ -33,17 +33,20 @@ function agoLabel(ts) {
 }
 
 // ── Fuel state classifier (mechanic view — no amounts) ───────────────────────
-// fuelHist: [{fuel, speed}] last 5 polls; wasStaleOnline: bool carried forward
-function classifyFuel(status, fuelHist, wasStaleOnline) {
+// fuelTrack: { lastFuel, mileageAtLastChange } — updated by caller each poll
+// wasStaleOnline: bool carried forward when vehicle goes offline
+function classifyFuel(status, fuelTrack, wasStaleOnline) {
   if (!status) return null;
   const fuel = status.fuel;
   if (fuel == null) return null; // no sensor configured in CMSV
   const online = (status.ol ?? status.online ?? 0) !== 0;
   if (online) {
-    // stale = fuel unchanged across last 3+ polls while speed > 0
-    const movingPolls = fuelHist.filter(h => h.speed != null && h.speed >= 3);
-    const stale = movingPolls.length >= 3 &&
-      movingPolls.slice(-3).every(h => h.fuel === movingPolls[movingPolls.length - 3].fuel);
+    const mileage = status.mileageKm ?? null;
+    // stale = fuel unchanged while vehicle moved ≥ 1 km since last fuel change
+    const distanceSinceChange = (mileage != null && fuelTrack.mileageAtLastChange != null)
+      ? mileage - fuelTrack.mileageAtLastChange
+      : null;
+    const stale = distanceSinceChange != null && distanceSinceChange >= 1;
     if (stale) return 'stale_driving';
     return 'ok';
   } else {
@@ -345,8 +348,8 @@ function MechanicView() {
   const [workVehicle, setWorkVehicle] = useState('');
   const [workStatus, setWorkStatus]   = useState(null);
   const [workLogs, setWorkLogs]       = useState([]);
-  const fuelHistRef     = useRef([]); // [{fuel, speed}] last 5 polls
-  const wasStaleRef     = useRef(false); // was sensor stale while online?
+  const fuelTrackRef = useRef({ lastFuel: null, mileageAtLastChange: null }); // odometer-based stale detection
+  const wasStaleRef  = useRef(false); // was sensor stale while online?
   const [fuelKind, setFuelKind] = useState(null);
   const [workLogsLoading, setWorkLogsLoading] = useState(false);
 
@@ -379,21 +382,23 @@ function MechanicView() {
 
   // Status polling for selected work vehicle
   useEffect(() => {
-    if (!workVehicle) { setWorkStatus(null); setWorkLogs([]); fuelHistRef.current = []; wasStaleRef.current = false; setFuelKind(null); return; }
+    if (!workVehicle) { setWorkStatus(null); setWorkLogs([]); fuelTrackRef.current = { lastFuel: null, mileageAtLastChange: null }; wasStaleRef.current = false; setFuelKind(null); return; }
     const applyStatus = (s) => {
       setWorkStatus(s);
       if (!s) return;
       const online = (s.ol ?? s.online ?? 0) !== 0;
-      const hist = fuelHistRef.current;
-      // Push new entry (keep last 5)
-      const next = [...hist.slice(-4), { fuel: s.fuel, speed: s.speed }];
-      fuelHistRef.current = next;
-      const kind = classifyFuel(s, next, wasStaleRef.current);
-      // While online, track whether sensor was stale
+      const track = fuelTrackRef.current;
+      // Update mileage-at-last-change: reset when fuel value changes
+      if (s.fuel != null) {
+        if (track.lastFuel == null || s.fuel !== track.lastFuel) {
+          fuelTrackRef.current = { lastFuel: s.fuel, mileageAtLastChange: s.mileageKm ?? null };
+        }
+      }
+      const kind = classifyFuel(s, fuelTrackRef.current, wasStaleRef.current);
       if (online) wasStaleRef.current = kind === 'stale_driving';
       setFuelKind(kind);
     };
-    fuelHistRef.current = [];
+    fuelTrackRef.current = { lastFuel: null, mileageAtLastChange: null };
     wasStaleRef.current = false;
     api.get(`/mechanic/vehicle-status/${workVehicle}`).then(r => applyStatus(r.data.data)).catch(() => {});
     loadWorkLogs(workVehicle);
