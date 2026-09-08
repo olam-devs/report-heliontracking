@@ -141,6 +141,38 @@ exports.unmarkPending = async (req, res) => {
   } catch (e) { err(res, e.message, 500); }
 };
 
+// ── Maintenance vehicles ──────────────────────────────────────────────────────
+
+exports.getMaintenanceVehicles = async (req, res) => {
+  try { ok(res, await M.getMaintenanceVehicles()); }
+  catch (e) { err(res, e.message, 500); }
+};
+
+exports.moveToMaintenance = async (req, res) => {
+  try {
+    const { devIdno, plate, note, remove_pending } = req.body;
+    if (!devIdno) return err(res, 'devIdno required');
+    await M.moveToMaintenance({ devIdno, plate, note, moved_by: req.user.id });
+    if (remove_pending) await M.unmarkVehiclePending(devIdno);
+    ok(res, { moved: true });
+  } catch (e) { err(res, e.message, 500); }
+};
+
+exports.updateMaintenanceNote = async (req, res) => {
+  try {
+    const { note } = req.body;
+    await M.updateMaintenanceNote(req.params.devIdno, note);
+    ok(res, { updated: true });
+  } catch (e) { err(res, e.message, 500); }
+};
+
+exports.removeFromMaintenance = async (req, res) => {
+  try {
+    await M.removeFromMaintenance(req.params.devIdno);
+    ok(res, { removed: true });
+  } catch (e) { err(res, e.message, 500); }
+};
+
 // ── Admin: get all active grants ─────────────────────────────────────────────
 
 exports.adminListAccess = async (req, res) => {

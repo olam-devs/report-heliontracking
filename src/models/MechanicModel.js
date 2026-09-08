@@ -244,6 +244,54 @@ exports.unmarkVehiclePending = async (devIdno) => {
   await db.query('DELETE FROM mechanic_pending_vehicles WHERE devIdno = ?', [devIdno]);
 };
 
+// ── Maintenance vehicles ──────────────────────────────────────────────────────
+
+exports.ensureMaintenanceTable = async () => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS mechanic_maintenance_vehicles (
+      devIdno      VARCHAR(64) PRIMARY KEY,
+      plate        VARCHAR(64),
+      note         TEXT,
+      moved_by     INT,
+      moved_at     DATETIME DEFAULT NOW(),
+      updated_at   DATETIME DEFAULT NOW() ON UPDATE NOW()
+    )
+  `);
+};
+
+exports.getMaintenanceVehicles = async () => {
+  await exports.ensureMaintenanceTable();
+  const [rows] = await db.query(
+    `SELECT mmv.*, u.name AS moved_by_name
+     FROM mechanic_maintenance_vehicles mmv
+     LEFT JOIN users u ON u.id = mmv.moved_by
+     ORDER BY mmv.moved_at DESC`
+  );
+  return rows;
+};
+
+exports.moveToMaintenance = async ({ devIdno, plate, note, moved_by }) => {
+  await exports.ensureMaintenanceTable();
+  await db.query(
+    `INSERT INTO mechanic_maintenance_vehicles (devIdno, plate, note, moved_by)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE plate = VALUES(plate), note = VALUES(note),
+       moved_by = VALUES(moved_by), moved_at = NOW(), updated_at = NOW()`,
+    [devIdno, plate || devIdno, note || null, moved_by]
+  );
+};
+
+exports.updateMaintenanceNote = async (devIdno, note) => {
+  await db.query(
+    `UPDATE mechanic_maintenance_vehicles SET note = ?, updated_at = NOW() WHERE devIdno = ?`,
+    [note || null, devIdno]
+  );
+};
+
+exports.removeFromMaintenance = async (devIdno) => {
+  await db.query('DELETE FROM mechanic_maintenance_vehicles WHERE devIdno = ?', [devIdno]);
+};
+
 // ── Admin notes for all of a mechanic's vehicles ──────────────────────────────
 
 exports.getAdminNotesForMechanic = async (mechanic_user_id) => {

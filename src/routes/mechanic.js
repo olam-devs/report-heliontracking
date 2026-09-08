@@ -51,5 +51,10 @@ router.put('/admin/notes/:id',            requireAdmin, c.adminEditNote);
 router.delete('/admin/notes/:id',         requireAdmin, c.adminDeleteNote);
 router.post('/admin/pending',             requireAdmin, c.markPending);
 router.delete('/admin/pending/:devIdno',  requireAdmin, c.unmarkPending);
+router.get('/admin/maintenance',          requireAdmin, c.getMaintenanceVehicles);
+router.post('/admin/maintenance',         requireAdmin, c.moveToMaintenance);
+router.put('/admin/maintenance/:devIdno', requireAdmin, c.updateMaintenanceNote);
+router.delete('/admin/maintenance/:devIdno', requireAdmin, c.removeFromMaintenance);
+router.get('/maintenance',               requireMechanic, c.getMaintenanceVehicles);
 
 module.exports = router;

@@ -343,6 +343,7 @@ function MechanicView() {
   const [fleetVehicles, setFleetVehicles]   = useState([]);
   const [workedVehicles, setWorkedVehicles] = useState([]);
   const [pendingVehicles, setPendingVehicles] = useState([]);
+  const [maintenanceVehicles, setMaintenanceVehicles] = useState([]);
 
   // Log Work page
   const [workVehicle, setWorkVehicle] = useState('');
@@ -374,10 +375,14 @@ function MechanicView() {
   const refreshPending = () =>
     api.get('/mechanic/pending').then(r => setPendingVehicles(r.data.data || [])).catch(() => {});
 
+  const refreshMaintenance = () =>
+    api.get('/mechanic/maintenance').then(r => setMaintenanceVehicles(r.data.data || [])).catch(() => {});
+
   useEffect(() => {
     api.get('/mechanic/all-vehicles').then(r => setFleetVehicles(r.data.data || [])).catch(() => {});
     refreshWorkedVehicles();
     refreshPending();
+    refreshMaintenance();
   }, []);
 
   // Status polling for selected work vehicle
@@ -453,10 +458,11 @@ function MechanicView() {
   const vehicleList = fleetVehicles.length ? fleetVehicles : workedVehicles;
 
   const navItems = [
-    { id: 'work',          emoji: '🔧', label: 'Log Work'  },
-    { id: 'history',       emoji: '📋', label: 'History'   },
-    { id: 'notifications', emoji: '🔔', label: 'Notes',    badge: totalUnread },
-    { id: 'pending',       emoji: '⚠️',  label: 'Pending',  badge: pendingCount },
+    { id: 'work',          emoji: '🔧', label: 'Log Work'     },
+    { id: 'history',       emoji: '📋', label: 'History'      },
+    { id: 'notifications', emoji: '🔔', label: 'Notes',       badge: totalUnread },
+    { id: 'pending',       emoji: '⚠️',  label: 'Pending',     badge: pendingCount },
+    { id: 'maintenance',   emoji: '🛠️', label: 'Maintenance', badge: maintenanceVehicles.length || 0 },
   ];
 
   return (
@@ -799,16 +805,129 @@ function MechanicView() {
           </div>
         )}
 
+        {/* ══ Maintenance ══ */}
+        {page === 'maintenance' && (
+          <div className="p-4 space-y-4 max-w-lg mx-auto">
+            <h2 className="text-base font-bold text-gray-800 pt-1">🛠️ Under Maintenance</h2>
+            <p className="text-xs text-gray-500">Vehicles whose problem has been identified. Work is in progress — may be awaiting parts or tools.</p>
+
+            {maintenanceVehicles.length === 0 ? (
+              <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
+                <div className="text-4xl mb-3">🛠️</div>
+                <p className="font-semibold text-gray-700">No vehicles under maintenance</p>
+                <p className="text-sm text-gray-400 mt-1">Supervisor will move vehicles here once the problem is identified.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {maintenanceVehicles.map(m => (
+                  <div key={m.devIdno} className="bg-white rounded-2xl border-2 border-blue-300 p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <span className="text-2xl mt-0.5 shrink-0">🛠️</span>
+                        <div className="min-w-0">
+                          <p className="font-bold text-gray-900 text-base">{m.plate || m.devIdno}</p>
+                          {m.note ? (
+                            <div className="mt-1.5 bg-blue-50 border border-blue-200 rounded-xl p-3">
+                              <p className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">Maintenance note</p>
+                              <p className="text-sm text-blue-900 whitespace-pre-wrap">{m.note}</p>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-400 italic mt-1">No maintenance note added yet</p>
+                          )}
+                          <p className="text-xs text-gray-400 mt-2">
+                            Moved {m.moved_by_name ? `by ${m.moved_by_name}` : ''} · {fmtTs(m.moved_at)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 shrink-0">
+                        <button
+                          onClick={() => { setWorkVehicle(m.devIdno); setPage('work'); }}
+                          className="btn text-xs py-2 px-4 bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200">
+                          Log work
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+// ── Admin: Move to Maintenance modal ─────────────────────────────────────────
+function MoveToMaintenanceModal({ vehicle, pendingNote, onConfirm, onClose }) {
+  const [useExisting, setUseExisting] = useState(!!pendingNote);
+  const [customNote, setCustomNote]   = useState('');
+  const [saving, setSaving]           = useState(false);
+
+  const handleConfirm = async () => {
+    setSaving(true);
+    const note = useExisting ? (pendingNote || '') : customNote.trim();
+    await onConfirm({ note, removePending: true });
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center p-0 md:p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-white w-full md:max-w-lg md:rounded-2xl rounded-t-2xl shadow-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <span className="font-bold text-gray-900">🛠️ Move to Maintenance — {vehicle.plate || vehicle.devIdno}</span>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-sm text-gray-600">The problem has been identified. Choose the maintenance note mechanics will see:</p>
+          {pendingNote && (
+            <label className="flex items-start gap-3 p-3 rounded-xl border cursor-pointer hover:bg-orange-50 transition-colors"
+              style={{ borderColor: useExisting ? '#f97316' : '#e5e7eb' }}>
+              <input type="radio" checked={useExisting} onChange={() => setUseExisting(true)} className="mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Use pending note</p>
+                <p className="text-sm text-orange-700 mt-0.5">"{pendingNote}"</p>
+              </div>
+            </label>
+          )}
+          <label className="flex items-start gap-3 p-3 rounded-xl border cursor-pointer hover:bg-blue-50 transition-colors"
+            style={{ borderColor: !useExisting ? '#3b82f6' : '#e5e7eb' }}>
+            <input type="radio" checked={!useExisting} onChange={() => setUseExisting(false)} className="mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-800">Write maintenance note</p>
+              {!useExisting && (
+                <textarea
+                  value={customNote}
+                  onChange={e => setCustomNote(e.target.value)}
+                  rows={3}
+                  placeholder="Describe the identified problem and what is needed…"
+                  className="input w-full resize-none text-sm mt-2"
+                  autoFocus
+                />
+              )}
+            </div>
+          </label>
+          <div className="flex gap-3 pt-1">
+            <button onClick={handleConfirm} disabled={saving || (!useExisting && !customNote.trim())}
+              className="btn btn-primary flex-1 disabled:opacity-40">
+              {saving ? 'Moving…' : '🛠️ Move to Maintenance'}
+            </button>
+            <button onClick={onClose} className="btn flex-1">Cancel</button>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 // ── Admin: Pending Vehicles tab ──────────────────────────────────────────────
-function PendingAdminTab({ pendingVehicles, onUnmark, onEditReason }) {
-  const [editingId, setEditingId] = useState(null); // devIdno being edited
-  const [editDraft, setEditDraft] = useState('');
-  const [saving, setSaving] = useState(false);
+function PendingAdminTab({ pendingVehicles, onUnmark, onEditReason, onMoveToMaintenance }) {
+  const [editingId, setEditingId]       = useState(null);
+  const [editDraft, setEditDraft]       = useState('');
+  const [saving, setSaving]             = useState(false);
+  const [maintModal, setMaintModal]     = useState(null); // pending vehicle being moved
 
   const startEdit = (p) => { setEditingId(p.devIdno); setEditDraft(p.reason || ''); };
   const cancelEdit = () => { setEditingId(null); setEditDraft(''); };
@@ -832,55 +951,190 @@ function PendingAdminTab({ pendingVehicles, onUnmark, onEditReason }) {
   }
 
   return (
+    <>
+      {maintModal && (
+        <MoveToMaintenanceModal
+          vehicle={maintModal}
+          pendingNote={maintModal.reason || ''}
+          onConfirm={async ({ note, removePending }) => {
+            await onMoveToMaintenance(maintModal.devIdno, maintModal.plate, note, removePending);
+            setMaintModal(null);
+          }}
+          onClose={() => setMaintModal(null)}
+        />
+      )}
+      <div className="space-y-3 mt-2">
+        <p className="text-xs text-gray-400 font-medium px-1">
+          {pendingVehicles.length} vehicle{pendingVehicles.length !== 1 ? 's' : ''} pending — visible to all mechanics
+        </p>
+        {pendingVehicles.map(p => (
+          <div key={p.devIdno} className="card p-4 border-orange-300 bg-orange-50 space-y-3">
+            <div className="flex items-start gap-3 flex-wrap">
+              <span className="text-xl mt-0.5 shrink-0">⚠️</span>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-900 text-base">{p.plate || p.devIdno}</p>
+                {editingId === p.devIdno ? (
+                  <div className="mt-2 space-y-2">
+                    <textarea
+                      value={editDraft}
+                      onChange={e => setEditDraft(e.target.value)}
+                      rows={2}
+                      placeholder="Pending reason (what needs to be done)…"
+                      className="input w-full resize-none text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <button onClick={() => saveEdit(p.devIdno)} disabled={saving}
+                        className="btn btn-primary text-xs py-1.5 px-4 disabled:opacity-40">
+                        {saving ? 'Saving…' : 'Save reason'}
+                      </button>
+                      <button onClick={cancelEdit} className="text-xs text-gray-500 px-3">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {p.reason ? (
+                      <p className="text-sm text-orange-800 mt-0.5">{p.reason}</p>
+                    ) : (
+                      <p className="text-xs text-orange-400 italic mt-0.5">No reason set</p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">
+                      Flagged {p.marked_by_name ? `by ${p.marked_by_name}` : ''} · {fmtTs(p.marked_at)}
+                    </p>
+                  </>
+                )}
+              </div>
+              {editingId !== p.devIdno && (
+                <div className="flex flex-col gap-2 shrink-0">
+                  <button onClick={() => setMaintModal(p)}
+                    className="btn text-xs py-1.5 px-3 bg-blue-600 text-white border-blue-600 hover:bg-blue-700">
+                    🛠️ Move to Maintenance
+                  </button>
+                  <button onClick={() => startEdit(p)}
+                    className="btn text-xs py-1.5 px-3 bg-white text-orange-700 border-orange-300 hover:bg-orange-100">
+                    ✏️ Edit reason
+                  </button>
+                  <button onClick={() => onUnmark(p.devIdno)}
+                    className="btn text-xs py-1.5 px-3 bg-white text-green-700 border-green-300 hover:bg-green-50">
+                    ✓ Remove pending
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ── Admin: Maintenance tab ────────────────────────────────────────────────────
+function MaintenanceAdminTab({ maintenanceVehicles, vehicles, onRemove, onUpdateNote, onMoveAny }) {
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [saving, setSaving]       = useState(false);
+  const [addModal, setAddModal]   = useState(false);
+  const [addVehicle, setAddVehicle] = useState('');
+  const [addNote, setAddNote]     = useState('');
+  const [addSaving, setAddSaving] = useState(false);
+
+  const startEdit = (m) => { setEditingId(m.devIdno); setEditDraft(m.note || ''); };
+  const cancelEdit = () => { setEditingId(null); setEditDraft(''); };
+  const saveEdit = async (devIdno) => {
+    setSaving(true);
+    await onUpdateNote(devIdno, editDraft);
+    setSaving(false);
+    setEditingId(null);
+  };
+
+  const handleAdd = async () => {
+    if (!addVehicle) return;
+    setAddSaving(true);
+    const v = vehicles.find(x => x.devIdno === addVehicle);
+    await onMoveAny(addVehicle, v?.plate || addVehicle, addNote.trim(), false);
+    setAddSaving(false);
+    setAddModal(false);
+    setAddVehicle('');
+    setAddNote('');
+  };
+
+  return (
     <div className="space-y-3 mt-2">
-      <p className="text-xs text-gray-400 font-medium px-1">
-        {pendingVehicles.length} vehicle{pendingVehicles.length !== 1 ? 's' : ''} pending — visible to all mechanics
-      </p>
-      {pendingVehicles.map(p => (
-        <div key={p.devIdno} className="card p-4 border-orange-300 bg-orange-50 space-y-3">
+      <div className="flex items-center justify-between px-1">
+        <p className="text-xs text-gray-400 font-medium">
+          {maintenanceVehicles.length} vehicle{maintenanceVehicles.length !== 1 ? 's' : ''} under maintenance
+        </p>
+        <button onClick={() => setAddModal(true)}
+          className="btn btn-primary text-xs py-1.5 px-4">+ Add vehicle</button>
+      </div>
+
+      {addModal && (
+        <div className="card p-4 border-blue-300 bg-blue-50 space-y-3">
+          <p className="text-sm font-bold text-blue-800">Add vehicle to maintenance</p>
+          <select className="input" value={addVehicle} onChange={e => setAddVehicle(e.target.value)}>
+            <option value="">Select vehicle…</option>
+            {vehicles.map(v => <option key={v.devIdno} value={v.devIdno}>{v.plate || v.devIdno}</option>)}
+          </select>
+          <textarea value={addNote} onChange={e => setAddNote(e.target.value)} rows={3}
+            placeholder="Maintenance note — describe the identified problem and what is needed…"
+            className="input w-full resize-none text-sm" />
+          <div className="flex gap-2">
+            <button onClick={handleAdd} disabled={addSaving || !addVehicle}
+              className="btn btn-primary text-xs py-1.5 px-4 disabled:opacity-40">
+              {addSaving ? 'Saving…' : '🛠️ Add to Maintenance'}
+            </button>
+            <button onClick={() => setAddModal(false)} className="text-xs text-gray-500 px-3">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {maintenanceVehicles.length === 0 && !addModal && (
+        <div className="card p-12 text-center text-gray-400">
+          <div className="text-4xl mb-3">🛠️</div>
+          <p className="font-semibold text-gray-600">No vehicles under maintenance</p>
+          <p className="text-sm mt-1">Move vehicles here from the Pending tab, or add any vehicle above.</p>
+        </div>
+      )}
+
+      {maintenanceVehicles.map(m => (
+        <div key={m.devIdno} className="card p-4 border-blue-300 bg-blue-50 space-y-3">
           <div className="flex items-start gap-3 flex-wrap">
-            <span className="text-xl mt-0.5 shrink-0">⚠️</span>
+            <span className="text-xl mt-0.5 shrink-0">🛠️</span>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-gray-900 text-base">{p.plate || p.devIdno}</p>
-              {editingId === p.devIdno ? (
+              <p className="font-bold text-gray-900 text-base">{m.plate || m.devIdno}</p>
+              {editingId === m.devIdno ? (
                 <div className="mt-2 space-y-2">
-                  <textarea
-                    value={editDraft}
-                    onChange={e => setEditDraft(e.target.value)}
-                    rows={2}
-                    placeholder="Pending reason (what needs to be done)…"
-                    className="input w-full resize-none text-sm"
-                  />
+                  <textarea value={editDraft} onChange={e => setEditDraft(e.target.value)}
+                    rows={3} placeholder="Maintenance note…" className="input w-full resize-none text-sm" />
                   <div className="flex gap-2">
-                    <button onClick={() => saveEdit(p.devIdno)} disabled={saving}
+                    <button onClick={() => saveEdit(m.devIdno)} disabled={saving}
                       className="btn btn-primary text-xs py-1.5 px-4 disabled:opacity-40">
-                      {saving ? 'Saving…' : 'Save reason'}
+                      {saving ? 'Saving…' : 'Save note'}
                     </button>
                     <button onClick={cancelEdit} className="text-xs text-gray-500 px-3">Cancel</button>
                   </div>
                 </div>
               ) : (
                 <>
-                  {p.reason ? (
-                    <p className="text-sm text-orange-800 mt-0.5">{p.reason}</p>
+                  {m.note ? (
+                    <p className="text-sm text-blue-900 mt-0.5 whitespace-pre-wrap">{m.note}</p>
                   ) : (
-                    <p className="text-xs text-orange-400 italic mt-0.5">No reason set</p>
+                    <p className="text-xs text-blue-400 italic mt-0.5">No note added</p>
                   )}
                   <p className="text-xs text-gray-400 mt-1">
-                    Flagged {p.marked_by_name ? `by ${p.marked_by_name}` : ''} · {fmtTs(p.marked_at)}
+                    Moved {m.moved_by_name ? `by ${m.moved_by_name}` : ''} · {fmtTs(m.moved_at)}
                   </p>
                 </>
               )}
             </div>
-            {editingId !== p.devIdno && (
+            {editingId !== m.devIdno && (
               <div className="flex flex-col gap-2 shrink-0">
-                <button onClick={() => startEdit(p)}
-                  className="btn text-xs py-1.5 px-3 bg-white text-orange-700 border-orange-300 hover:bg-orange-100">
-                  ✏️ Edit reason
+                <button onClick={() => startEdit(m)}
+                  className="btn text-xs py-1.5 px-3 bg-white text-blue-700 border-blue-300 hover:bg-blue-100">
+                  ✏️ Edit note
                 </button>
-                <button onClick={() => onUnmark(p.devIdno)}
+                <button onClick={() => onRemove(m.devIdno)}
                   className="btn text-xs py-1.5 px-3 bg-white text-green-700 border-green-300 hover:bg-green-50">
-                  ✓ Remove pending
+                  ✓ Done / Remove
                 </button>
               </div>
             )}
@@ -897,6 +1151,7 @@ function AdminView() {
   const [mechanics, setMechanics]   = useState([]);
   const [vehicles, setVehicles]     = useState([]);
   const [pendingVehicles, setPendingVehicles] = useState([]);
+  const [maintenanceVehicles, setMaintenanceVehicles] = useState([]);
   const [logs, setLogs]             = useState([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsError, setLogsError]   = useState('');
@@ -922,6 +1177,7 @@ function AdminView() {
   const [showPendingForm, setShowPendingForm] = useState(false);
   const [pendingReason, setPendingReason]     = useState('');
   const [savingPending, setSavingPending]     = useState(false);
+  const [maintModalForHistory, setMaintModalForHistory] = useState(null);
 
   // Admin note form
   const [noteVehicle, setNoteVehicle] = useState('');
@@ -934,12 +1190,16 @@ function AdminView() {
   const refreshPending = () =>
     api.get('/mechanic/pending').then(r => setPendingVehicles(r.data.data || [])).catch(() => {});
 
+  const refreshMaintenance = () =>
+    api.get('/mechanic/admin/maintenance').then(r => setMaintenanceVehicles(r.data.data || [])).catch(() => {});
+
   useEffect(() => {
     api.get('/mechanic/admin/mechanics').then(r => setMechanics(r.data.data || [])).catch(() => {});
     api.get('/tracking/vehicles').then(r => setVehicles(r.data.data || [])).catch(() => {});
     api.get('/mechanic/admin/notes').then(r => setAdminNotes(r.data.data || [])).catch(() => {});
     refreshUnreadCount();
     refreshPending();
+    refreshMaintenance();
   }, []);
 
   const loadLogs = async () => {
@@ -1048,6 +1308,31 @@ function AdminView() {
     } catch (e) { toast.error('Failed to update reason'); }
   };
 
+  const handleMoveToMaintenance = async (devIdno, plate, note, removePending) => {
+    try {
+      await api.post('/mechanic/admin/maintenance', { devIdno, plate, note, remove_pending: removePending });
+      toast.success('Vehicle moved to maintenance');
+      refreshMaintenance();
+      if (removePending) refreshPending();
+    } catch (e) { toast.error('Failed to move to maintenance'); }
+  };
+
+  const handleUpdateMaintenanceNote = async (devIdno, note) => {
+    try {
+      await api.put(`/mechanic/admin/maintenance/${encodeURIComponent(devIdno)}`, { note });
+      toast.success('Maintenance note updated');
+      refreshMaintenance();
+    } catch (e) { toast.error('Failed to update note'); }
+  };
+
+  const handleRemoveFromMaintenance = async (devIdno) => {
+    try {
+      await api.delete(`/mechanic/admin/maintenance/${encodeURIComponent(devIdno)}`);
+      toast.success('Vehicle removed from maintenance');
+      setMaintenanceVehicles(prev => prev.filter(m => String(m.devIdno) !== String(devIdno)));
+    } catch (e) { toast.error('Failed to remove from maintenance'); }
+  };
+
   const Tab = ({ id, label, badge }) => (
     <button onClick={() => setTab(id)}
       className={`relative px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === id ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
@@ -1062,12 +1347,24 @@ function AdminView() {
 
   return (
     <div className="p-6 space-y-5">
+      {maintModalForHistory && (
+        <MoveToMaintenanceModal
+          vehicle={maintModalForHistory}
+          pendingNote={maintModalForHistory.reason || ''}
+          onConfirm={async ({ note, removePending }) => {
+            await handleMoveToMaintenance(maintModalForHistory.devIdno, maintModalForHistory.plate, note, removePending);
+            setMaintModalForHistory(null);
+          }}
+          onClose={() => setMaintModalForHistory(null)}
+        />
+      )}
       <h1 className="text-xl font-bold text-gray-900">Mechanic Management</h1>
 
       <div className="flex border-b border-gray-200 gap-1 flex-wrap">
-        <Tab id="logs"    label="Work Logs"      badge={unreadCount} />
-        <Tab id="history" label="Vehicle History" />
-        <Tab id="pending" label="Pending Vehicles" badge={pendingVehicles.length} />
+        <Tab id="logs"        label="Work Logs"        badge={unreadCount} />
+        <Tab id="history"     label="Vehicle History"  />
+        <Tab id="pending"     label="Pending Vehicles" badge={pendingVehicles.length} />
+        <Tab id="maintenance" label="Maintenance"      badge={maintenanceVehicles.length} />
       </div>
 
       {/* ── Work Logs tab ── */}
@@ -1193,6 +1490,17 @@ function AdminView() {
           pendingVehicles={pendingVehicles}
           onUnmark={handleUnmarkPending}
           onEditReason={handleEditPendingReason}
+          onMoveToMaintenance={handleMoveToMaintenance}
+        />
+      )}
+
+      {tab === 'maintenance' && (
+        <MaintenanceAdminTab
+          maintenanceVehicles={maintenanceVehicles}
+          vehicles={vehicles}
+          onRemove={handleRemoveFromMaintenance}
+          onUpdateNote={handleUpdateMaintenanceNote}
+          onMoveAny={handleMoveToMaintenance}
         />
       )}
 
@@ -1247,7 +1555,8 @@ function AdminView() {
           {histSearched && !histLoading && (() => {
             const timeline = mergeTimeline(histLogs, histNotes);
             const plate = vehicles.find(v => v.devIdno === histVehicle)?.plate || histVehicle;
-            const isPending = !!pendingVehicles.find(p => p.devIdno === histVehicle);
+            const pendingEntry = pendingVehicles.find(p => p.devIdno === histVehicle);
+            const isPending = !!pendingEntry;
 
             return (
               <div className="space-y-4">
@@ -1270,7 +1579,7 @@ function AdminView() {
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {isPending ? (
                       <button onClick={() => handleUnmarkPending(histVehicle)}
                         className="btn text-xs py-1.5 px-3 bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200">
@@ -1282,6 +1591,13 @@ function AdminView() {
                         ⚠️ Mark as Pending
                       </button>
                     )}
+                    <button onClick={() => {
+                      const v = vehicles.find(x => x.devIdno === histVehicle);
+                      setMaintModalForHistory({ devIdno: histVehicle, plate: v?.plate || histVehicle, reason: pendingEntry?.reason || '' });
+                    }}
+                      className="btn text-xs py-1.5 px-3 bg-blue-600 text-white border-blue-600 hover:bg-blue-700">
+                      🛠️ Move to Maintenance
+                    </button>
                   </div>
                 </div>
 
