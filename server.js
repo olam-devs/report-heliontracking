@@ -45,14 +45,18 @@ app.use('/api/dispatch', require('./src/routes/dispatch'));
 
 const { startNotificationScanner } = require('./src/tracking/notification-scanner.service');
 const db = require('./src/config/db');
-async function runStartupMigrations() {
+async function addColIfMissing(col, def) {
   try {
-    await db.query(`ALTER TABLE users ADD COLUMN can_view_dispatch TINYINT(1) NOT NULL DEFAULT 0`);
+    await db.query(`ALTER TABLE users ADD COLUMN ${col} ${def}`);
   } catch (e) {
-    if (!e.message?.includes('Duplicate column') && !e.message?.includes('already exists') && !e.code?.includes('ER_DUP_FIELDNAME')) {
-      console.error('[migration] can_view_dispatch:', e.message);
+    if (!e.message?.includes('Duplicate column') && !e.message?.includes('already exists') && e.code !== 'ER_DUP_FIELDNAME') {
+      console.error(`[migration] ${col}:`, e.message);
     }
   }
+}
+async function runStartupMigrations() {
+  await addColIfMissing('can_view_dispatch', 'TINYINT(1) NOT NULL DEFAULT 0');
+  await addColIfMissing('dispatch_vehicles', 'TEXT NULL');
 }
 const dailyLog = require('./src/tracking/lib/services/daily-log.service');
 const { purgeAllUncalibratedNotifications, purgeMalformedNotifications } = require('./src/tracking/fuel-insights.engine');

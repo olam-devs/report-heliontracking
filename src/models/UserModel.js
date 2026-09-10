@@ -19,9 +19,10 @@ const toRow = (row) => row ? {
   driver_access:        parseJson(row.driver_access),
   case_specific_access: parseJson(row.case_specific_access),
   tracking_page_access: parseJson(row.tracking_page_access),
+  dispatch_vehicles:   parseJson(row.dispatch_vehicles),
 } : null;
 
-const COLS = 'id, name, email, role, is_active, can_edit_reports, can_view_tracking, can_view_dispatch, can_create_cases, can_edit_cases, can_download_evidence, case_access, driver_access, case_specific_access, tracking_page_access, created_at';
+const COLS = 'id, name, email, role, is_active, can_edit_reports, can_view_tracking, can_view_dispatch, can_create_cases, can_edit_cases, can_download_evidence, case_access, driver_access, case_specific_access, tracking_page_access, dispatch_vehicles, created_at';
 
 exports.findAll = async () => {
   const [rows] = await db.query(`SELECT ${COLS} FROM users ORDER BY id ASC`);
@@ -55,14 +56,14 @@ exports.create = async ({ name, email, password, role = 'reporter', is_active = 
 };
 
 exports.update = async (id, fields) => {
-  const allowed = ['name', 'email', 'role', 'is_active', 'can_edit_reports', 'can_view_tracking', 'can_view_dispatch', 'can_create_cases', 'can_edit_cases', 'can_download_evidence', 'case_access', 'driver_access', 'case_specific_access', 'tracking_page_access'];
+  const allowed = ['name', 'email', 'role', 'is_active', 'can_edit_reports', 'can_view_tracking', 'can_view_dispatch', 'can_create_cases', 'can_edit_cases', 'can_download_evidence', 'case_access', 'driver_access', 'case_specific_access', 'tracking_page_access', 'dispatch_vehicles'];
   const updates = [];
   const params = [];
   for (const key of allowed) {
     if (!(key in fields)) continue;
     let val = fields[key];
     if (['is_active','can_edit_reports','can_view_tracking','can_view_dispatch','can_create_cases','can_edit_cases','can_download_evidence'].includes(key)) val = val ? 1 : 0;
-    if (['case_access', 'driver_access', 'case_specific_access', 'tracking_page_access'].includes(key)) {
+    if (['case_access', 'driver_access', 'case_specific_access', 'tracking_page_access', 'dispatch_vehicles'].includes(key)) {
       val = val && (typeof val === 'object' ? Object.keys(val).length > 0 : val.length > 0) ? JSON.stringify(val) : null;
     }
     updates.push(`${key} = ?`);
