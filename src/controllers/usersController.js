@@ -22,7 +22,7 @@ exports.show = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { name, email, password, role, is_active, can_edit_reports, can_view_tracking, can_create_cases, can_edit_cases, can_download_evidence, case_access, driver_access, case_specific_access, tracking_page_access } = req.body;
+    const { name, email, password, role, is_active, can_edit_reports, can_view_tracking, can_view_dispatch, can_create_cases, can_edit_cases, can_download_evidence, case_access, driver_access, case_specific_access, tracking_page_access } = req.body;
     if (!name || !email || !password) return res.status(400).json({ error: 'Name, email and password are required' });
 
     const existing = await UserModel.findByEmail(email);
@@ -34,6 +34,7 @@ exports.create = async (req, res) => {
       is_active:             is_active !== false,
       can_edit_reports:      !!can_edit_reports,
       can_view_tracking:     !!can_view_tracking,
+      can_view_dispatch:     !!can_view_dispatch,
       can_create_cases:      can_create_cases !== false,
       can_edit_cases:        can_edit_cases !== false,
       can_download_evidence: can_download_evidence !== false,
@@ -54,10 +55,10 @@ exports.update = async (req, res) => {
     const user = await UserModel.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const { name, email, role, is_active, can_edit_reports, can_view_tracking, can_create_cases, can_edit_cases, can_download_evidence, case_access, driver_access, case_specific_access, tracking_page_access } = req.body;
+    const { name, email, role, is_active, can_edit_reports, can_view_tracking, can_view_dispatch, can_create_cases, can_edit_cases, can_download_evidence, case_access, driver_access, case_specific_access, tracking_page_access } = req.body;
     await UserModel.update(req.params.id, {
       name, email, role, is_active,
-      can_edit_reports, can_view_tracking, can_create_cases, can_edit_cases, can_download_evidence,
+      can_edit_reports, can_view_tracking, can_view_dispatch, can_create_cases, can_edit_cases, can_download_evidence,
       case_access,
       driver_access,
       case_specific_access,
