@@ -111,24 +111,41 @@ export default function LiveMap({ user }) {
 
     for (const id of currentSelected) {
       const v = byId[id];
-      if (!v || !v.gpsValid || v.lat == null || v.lng == null) continue;
+      if (!v || v.lat == null || v.lng == null) continue;
 
+      const online = !!v.online;
       const online = v.online;
-      const color = !v.gpsValid ? "#9e9e9e" : online ? "#3daf7a" : "#f57c00";
+      const gpsOk = v.gpsValid && v.gpsLocked !== false;
+      const unconfirmed = online && !gpsOk; // online but no GPS lock
       const ago = agoLabel(v.gpsTime);
-      const statusLine = !v.gpsValid
-        ? "GPS invalid"
+      const statusLine = !gpsOk
+        ? (unconfirmed ? "Online — GPS not locked" : "GPS Invalid")
         : online
         ? `Online${v.speed != null ? " · " + v.speed.toFixed(0) + " km/h" : ""}`
         : `Offline${ago ? " · " + ago : ""}`;
 
+      let labelHtml;
+      if (unconfirmed) {
+        // Online but GPS not yet locked — amber warning with striped border
+        labelHtml = `<div style="background:#fff3cd;color:#7c5a00;font-size:13px;font-weight:800;font-family:system-ui,sans-serif;padding:5px 11px;border-radius:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px dashed #f5a623;line-height:1.4;">${v.plate}<span style="font-size:10px;font-weight:600;margin-left:6px;color:#c17900">⚠ GPS?</span></div>`;
+      } else if (!gpsOk) {
+        // Completely invalid GPS
+        labelHtml = `<div style="background:#e0e0e0;color:#555;font-size:13px;font-weight:700;font-family:system-ui,sans-serif;padding:5px 10px;border-radius:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px solid #9e9e9e;line-height:1.4;opacity:0.8;">${v.plate}<span style="font-size:10px;font-weight:500;margin-left:5px;color:#888">No GPS</span></div>`;
+      } else {
+        const color = online ? "#3daf7a" : "#f57c00";
+        labelHtml = `<div style="background:${color};color:#fff;font-size:13px;font-weight:800;font-family:system-ui,sans-serif;padding:5px 11px;border-radius:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.35);border:2px solid rgba(255,255,255,0.7);line-height:1.4;">${v.plate}</div>`;
+      }
+
+      const color = unconfirmed ? "#f5a623" : !gpsOk ? "#9e9e9e" : online ? "#3daf7a" : "#f57c00";
       const icon = L.divIcon({
         className: "",
-        html: `<div style="background:${color};color:#fff;font-size:11px;font-weight:700;font-family:system-ui,sans-serif;padding:3px 7px;border-radius:10px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.35);border:2px solid #fff;line-height:1.3;">${v.plate}</div>`,
+        html: labelHtml,
         iconAnchor: [0, 0],
       });
 
-      const popup = `<div style="font-family:system-ui,sans-serif;font-size:13px;min-width:150px"><b style="font-size:14px">${v.plate}</b><br/><span style="color:${color};font-weight:600">${statusLine}</span><br/><span style="color:#666;font-size:11px">${v.lat.toFixed(6)}, ${v.lng.toFixed(6)}</span>${v.gpsTime ? `<br/><span style="color:#666;font-size:11px">GPS: ${new Date(v.gpsTime).toLocaleTimeString()}</span>` : ""}</div>`;
+      const satInfo = v.satellites != null ? ` · ${v.satellites} sat` : "";
+      const warningLine = unconfirmed ? `<br/><span style="background:#fff3cd;color:#7c5a00;font-size:11px;padding:2px 6px;border-radius:4px;font-weight:600;">⚠ GPS not locked — position may be inaccurate${satInfo}</span>` : "";
+      const popup = `<div style="font-family:system-ui,sans-serif;font-size:13px;min-width:160px"><b style="font-size:14px">${v.plate}</b><br/><span style="color:${color};font-weight:600">${statusLine}</span>${warningLine}<br/><span style="color:#666;font-size:11px">${v.lat.toFixed(6)}, ${v.lng.toFixed(6)}</span>${v.gpsTime ? `<br/><span style="color:#666;font-size:11px">GPS: ${new Date(v.gpsTime).toLocaleTimeString()}</span>` : ""}</div>`;
 
       if (markersRef.current[id]) {
         markersRef.current[id].setLatLng([v.lat, v.lng]).setIcon(icon).setPopupContent(popup);
@@ -371,7 +388,9 @@ export default function LiveMap({ user }) {
                   const isSelected = selected.has(v.devIdno);
                   const online = st?.online;
                   const ago = agoLabel(st?.gpsTime);
-                  const dotColor = !st ? t.border : !st.gpsValid ? t.muted : online ? t.green : t.orange;
+                  const gpsOkSt = st?.gpsValid && st?.gpsLocked !== false;
+                  const unconfirmedSt = st?.online && !gpsOkSt;
+                  const dotColor = !st ? t.border : unconfirmedSt ? "#f5a623" : !gpsOkSt ? t.muted : online ? t.green : t.orange;
 
                   return (
                     <div
@@ -400,7 +419,9 @@ export default function LiveMap({ user }) {
                         {st && (
                           <div style={{ fontSize: 10, marginTop: 1, display: "flex", alignItems: "center", gap: 4 }}>
                             <span style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0, display: "inline-block" }} />
-                            {!st.gpsValid
+                            {unconfirmedSt
+                              ? <span style={{ color: "#c17900", fontWeight: 700 }}>Online — GPS not locked</span>
+                              : !gpsOkSt
                               ? <span style={{ color: t.muted }}>GPS invalid</span>
                               : online
                               ? <span style={{ color: t.green }}>Online{st.speed != null ? ` · ${st.speed.toFixed(0)} km/h` : ""}</span>

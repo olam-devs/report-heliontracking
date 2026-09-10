@@ -28,17 +28,25 @@ router.get('/live-map', authDispatch, async (req, res) => {
     const statuses = await cms.getAllGPS().catch(() => []);
     res.json({
       success: true,
-      data: statuses.map(v => ({
-        devIdno:  String(v.devIdno || v.id || ''),
-        plate:    v.plate || v.nm || v.abbr || String(v.devIdno || v.id || ''),
-        group:    v.pnm  || null,
-        lat:      v.lat  ?? null,
-        lng:      v.lng  ?? null,
-        online:   (v.ol ?? v.online ?? 0) !== 0,
-        gpsTime:  v.gpsTime ?? v.gt ?? null,
-        speed:    v.speed   ?? null,
-        gpsValid: v.lat != null && v.lng != null && (Math.abs(v.lat) > 0.001 || Math.abs(v.lng) > 0.001),
-      })),
+      data: statuses.map(v => {
+        const hasFix = v.lat != null && v.lng != null &&
+          (Math.abs(v.lat) > 0.001 || Math.abs(v.lng) > 0.001);
+        const satellites = v.satellites ?? v.ns ?? null;
+        const gpsLocked = satellites == null ? hasFix : satellites > 0;
+        return {
+          devIdno:    String(v.devIdno || v.id || ''),
+          plate:      v.plate || v.nm || v.abbr || String(v.devIdno || v.id || ''),
+          group:      v.pnm  || null,
+          lat:        v.lat  ?? null,
+          lng:        v.lng  ?? null,
+          online:     (v.ol ?? v.online ?? 0) !== 0,
+          gpsTime:    v.gpsTime ?? v.gt ?? null,
+          speed:      v.speed   ?? null,
+          satellites,
+          gpsValid:   hasFix && gpsLocked,
+          gpsLocked,
+        };
+      }),
     });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
