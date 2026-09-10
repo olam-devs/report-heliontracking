@@ -20,6 +20,16 @@ function agoLabel(ts) {
   return rh > 0 ? `${d}D ${rh}H ago` : `${d}D ago`;
 }
 
+function groupVehicles(vehicles) {
+  const groups = {};
+  for (const v of vehicles) {
+    const g = v.group || "Ungrouped";
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(v);
+  }
+  return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+}
+
 export default function LiveMap({ user }) {
   const { t } = useTheme();
   const [allVehicles, setAllVehicles] = useState([]);
@@ -27,30 +37,44 @@ export default function LiveMap({ user }) {
   const [statuses, setStatuses] = useState({});
   const [running, setRunning] = useState(false);
   const [search, setSearch] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [expandedGroups, setExpandedGroups] = useState(new Set());
   const mapRef = useRef(null);
   const leafletRef = useRef(null);
   const markersRef = useRef({});
   const pollRef = useRef(null);
   const mapInitRef = useRef(false);
+  const searchRef = useRef(null);
 
-  // Load initial vehicle list from live-map (no separate /vehicles call needed)
   useEffect(() => {
     apiFetch("/live-map")
       .then(data => {
-        setAllVehicles(data || []);
+        const vehicles = data || [];
+        setAllVehicles(vehicles);
+        // Expand all groups by default
+        const groups = new Set(vehicles.map(v => v.group || "Ungrouped"));
+        setExpandedGroups(groups);
         setLoading(false);
       })
       .catch(e => { setError(e.message); setLoading(false); });
   }, []);
 
+  // Autocomplete suggestions
+  useEffect(() => {
+    if (!search.trim()) { setSuggestions([]); return; }
+    const q = search.toLowerCase();
+    const matches = allVehicles
+      .filter(v => v.plate?.toLowerCase().includes(q))
+      .slice(0, 8);
+    setSuggestions(matches);
+  }, [search, allVehicles]);
+
   // Init Leaflet map
   useEffect(() => {
-    if (mapInitRef.current) return;
-    if (!mapRef.current) return;
-    if (!window.L) return;
-
+    if (mapInitRef.current || !mapRef.current || !window.L) return;
     const L = window.L;
     const map = L.map(mapRef.current, { center: [-6.8, 39.28], zoom: 11 });
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -61,32 +85,22 @@ export default function LiveMap({ user }) {
     mapInitRef.current = true;
   });
 
-  const fetchAndUpdate = useCallback(async () => {
-    if (selected.size === 0) return;
-    try {
-      const data = await apiFetch("/live-map");
-      const byId = {};
-      for (const v of data) byId[v.devIdno] = v;
-      setStatuses(byId);
-      updateMarkers(byId);
-    } catch {}
-  }, [selected]);
-
-  function updateMarkers(byId) {
+  const updateMarkers = useCallback((byId, currentSelected) => {
     const L = window.L;
     if (!L || !leafletRef.current) return;
     const map = leafletRef.current;
 
-    // Remove markers for deselected vehicles
     for (const id of Object.keys(markersRef.current)) {
-      if (!selected.has(id)) {
+      if (!currentSelected.has(id)) {
         markersRef.current[id].remove();
         delete markersRef.current[id];
       }
     }
 
+    const isFirst = Object.keys(markersRef.current).length === 0;
     const bounds = [];
-    for (const id of selected) {
+
+    for (const id of currentSelected) {
       const v = byId[id];
       if (!v || !v.gpsValid || v.lat == null || v.lng == null) continue;
 
@@ -96,54 +110,43 @@ export default function LiveMap({ user }) {
       const statusLine = !v.gpsValid
         ? "GPS invalid"
         : online
-        ? `Online · ${v.speed != null ? v.speed.toFixed(0) + " km/h" : "idle"}`
+        ? `Online${v.speed != null ? " · " + v.speed.toFixed(0) + " km/h" : ""}`
         : `Offline${ago ? " · " + ago : ""}`;
 
       const icon = L.divIcon({
         className: "",
-        html: `<div style="
-          background:${color};
-          color:#fff;
-          font-size:11px;
-          font-weight:700;
-          font-family:system-ui,sans-serif;
-          padding:3px 7px;
-          border-radius:10px;
-          white-space:nowrap;
-          box-shadow:0 2px 6px rgba(0,0,0,0.35);
-          border:2px solid #fff;
-          line-height:1.3;
-        ">${v.plate}</div>`,
+        html: `<div style="background:${color};color:#fff;font-size:11px;font-weight:700;font-family:system-ui,sans-serif;padding:3px 7px;border-radius:10px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.35);border:2px solid #fff;line-height:1.3;">${v.plate}</div>`,
         iconAnchor: [0, 0],
       });
 
-      const popup = `
-        <div style="font-family:system-ui,sans-serif;font-size:13px;min-width:150px">
-          <b style="font-size:14px">${v.plate}</b><br/>
-          <span style="color:${color};font-weight:600">${statusLine}</span><br/>
-          <span style="color:#666;font-size:11px">${v.lat.toFixed(6)}, ${v.lng.toFixed(6)}</span><br/>
-          ${v.gpsTime ? `<span style="color:#666;font-size:11px">GPS: ${new Date(v.gpsTime).toLocaleTimeString()}</span>` : ""}
-        </div>`;
+      const popup = `<div style="font-family:system-ui,sans-serif;font-size:13px;min-width:150px"><b style="font-size:14px">${v.plate}</b><br/><span style="color:${color};font-weight:600">${statusLine}</span><br/><span style="color:#666;font-size:11px">${v.lat.toFixed(6)}, ${v.lng.toFixed(6)}</span>${v.gpsTime ? `<br/><span style="color:#666;font-size:11px">GPS: ${new Date(v.gpsTime).toLocaleTimeString()}</span>` : ""}</div>`;
 
       if (markersRef.current[id]) {
         markersRef.current[id].setLatLng([v.lat, v.lng]).setIcon(icon).setPopupContent(popup);
       } else {
-        const marker = L.marker([v.lat, v.lng], { icon }).addTo(map).bindPopup(popup);
-        markersRef.current[id] = marker;
+        markersRef.current[id] = L.marker([v.lat, v.lng], { icon }).addTo(map).bindPopup(popup);
       }
       bounds.push([v.lat, v.lng]);
     }
 
-    if (bounds.length > 0 && Object.keys(markersRef.current).length === bounds.length) {
-      // Only fit bounds on first placement (when markers are new)
-      const newIds = [...selected].filter(id => !Object.keys(markersRef.current).includes(id));
-      if (newIds.length > 0 || bounds.length <= 1) {
-        map.fitBounds(bounds.length === 1 ? L.latLng(bounds[0]).toBounds(2000) : bounds, { padding: [40, 40] });
-      }
+    if (isFirst && bounds.length > 0) {
+      const L2 = window.L;
+      if (bounds.length === 1) map.setView(bounds[0], 14);
+      else map.fitBounds(L2.latLngBounds(bounds), { padding: [40, 40] });
     }
-  }
+  }, []);
 
-  // Start/stop polling
+  const fetchAndUpdate = useCallback(async () => {
+    if (selected.size === 0) return;
+    try {
+      const data = await apiFetch("/live-map");
+      const byId = {};
+      for (const v of data) byId[v.devIdno] = v;
+      setStatuses(byId);
+      updateMarkers(byId, selected);
+    } catch {}
+  }, [selected, updateMarkers]);
+
   useEffect(() => {
     if (running && selected.size > 0) {
       fetchAndUpdate();
@@ -154,7 +157,6 @@ export default function LiveMap({ user }) {
     return () => clearInterval(pollRef.current);
   }, [running, selected, fetchAndUpdate]);
 
-  // Remove markers when deselected while running
   useEffect(() => {
     if (!leafletRef.current) return;
     for (const id of Object.keys(markersRef.current)) {
@@ -168,36 +170,54 @@ export default function LiveMap({ user }) {
   function toggleSelect(id) {
     setSelected(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleGroup(groupName, vehicles) {
+    const allIn = vehicles.every(v => selected.has(v.devIdno));
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (allIn) vehicles.forEach(v => next.delete(v.devIdno));
+      else vehicles.forEach(v => next.add(v.devIdno));
       return next;
     });
   }
 
   function selectAll() {
-    setSelected(new Set(filtered.map(v => v.devIdno)));
+    setSelected(new Set(filteredVehicles.map(v => v.devIdno)));
   }
 
   function clearAll() {
     setSelected(new Set());
     setRunning(false);
-    // Remove all markers
     for (const m of Object.values(markersRef.current)) m.remove();
     markersRef.current = {};
     setStatuses({});
   }
 
-  const filtered = allVehicles.filter(v =>
-    !search || v.plate?.toLowerCase().includes(search.toLowerCase())
-  );
+  function pickSuggestion(v) {
+    setSearch(v.plate);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    // Expand group containing this vehicle
+    const g = v.group || "Ungrouped";
+    setExpandedGroups(prev => new Set([...prev, g]));
+  }
 
-  const s = statuses;
+  const q = search.toLowerCase();
+  const filteredVehicles = q
+    ? allVehicles.filter(v => v.plate?.toLowerCase().includes(q))
+    : allVehicles;
+
+  const groups = groupVehicles(filteredVehicles);
 
   return (
-    <div style={{ display: "flex", height: "100%", gap: 0, overflow: "hidden", fontFamily: "system-ui,sans-serif" }}>
+    <div style={{ display: "flex", height: "100%", overflow: "hidden", fontFamily: "system-ui,sans-serif" }}>
       {/* Sidebar */}
       <div style={{
-        width: 280,
+        width: 284,
         minWidth: 240,
         background: t.panel,
         borderRight: `1px solid ${t.border}`,
@@ -206,116 +226,183 @@ export default function LiveMap({ user }) {
         overflow: "hidden",
       }}>
         {/* Header */}
-        <div style={{ padding: "14px 16px 10px", borderBottom: `1px solid ${t.border}` }}>
+        <div style={{ padding: "14px 14px 10px", borderBottom: `1px solid ${t.border}` }}>
           <div style={{ fontWeight: 800, fontSize: 14, color: t.text, marginBottom: 8 }}>
             Dispatch View
           </div>
-          <div style={{ position: "relative" }}>
-            <span style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: t.muted, pointerEvents: "none" }}>🔍</span>
+
+          {/* Search with autocomplete */}
+          <div style={{ position: "relative" }} ref={searchRef}>
             <input
               value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search plate number…"
+              onChange={e => { setSearch(e.target.value); setShowSuggestions(true); }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              placeholder="Search plate number..."
               style={{
-                width: "100%", boxSizing: "border-box", border: `1px solid ${t.border}`,
-                borderRadius: 8, padding: "6px 10px 6px 28px", fontSize: 12, color: t.text,
-                background: t.bg, outline: "none",
+                width: "100%", boxSizing: "border-box",
+                border: `1px solid ${t.border}`, borderRadius: 8,
+                padding: "7px 28px 7px 10px", fontSize: 12,
+                color: t.text, background: t.bg, outline: "none",
               }}
             />
             {search && (
               <button
-                onClick={() => setSearch("")}
-                style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: t.muted, fontSize: 14, lineHeight: 1 }}
+                onMouseDown={e => { e.preventDefault(); setSearch(""); setSuggestions([]); }}
+                style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: t.muted, fontSize: 16, lineHeight: 1 }}
               >×</button>
             )}
+            {showSuggestions && suggestions.length > 0 && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+                background: t.panel, border: `1px solid ${t.border}`, borderRadius: 8,
+                boxShadow: "0 4px 12px rgba(0,0,0,0.12)", zIndex: 100, overflow: "hidden",
+              }}>
+                {suggestions.map(v => (
+                  <div
+                    key={v.devIdno}
+                    onMouseDown={() => pickSuggestion(v)}
+                    style={{
+                      padding: "8px 12px", cursor: "pointer", fontSize: 12,
+                      color: t.text, borderBottom: `1px solid ${t.border}`,
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = t.accentSoft}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <span style={{ fontWeight: 700 }}>{v.plate}</span>
+                    <span style={{ fontSize: 10, color: t.textSoft }}>{v.group || ""}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+
           <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-            <button onClick={selectAll} style={btnStyle(t, "#5c6b7a")}>
-              Select All
-            </button>
-            <button onClick={clearAll} style={btnStyle(t, t.red)}>
-              Clear All
-            </button>
+            <button onClick={selectAll} style={btnStyle(t, t.textSoft)}>Select all</button>
+            <button onClick={clearAll} style={btnStyle(t, t.red)}>Clear all</button>
           </div>
         </div>
 
         {/* Controls */}
-        <div style={{ padding: "10px 16px", borderBottom: `1px solid ${t.border}`, display: "flex", gap: 8 }}>
+        <div style={{ padding: "10px 14px", borderBottom: `1px solid ${t.border}`, display: "flex", gap: 8, alignItems: "center" }}>
           <button
             onClick={() => { if (selected.size > 0) setRunning(true); }}
             disabled={running || selected.size === 0}
             style={btnStyle(t, t.accent, running || selected.size === 0)}
           >
-            ▶ Start
+            Start
           </button>
           <button
             onClick={() => setRunning(false)}
             disabled={!running}
             style={btnStyle(t, t.red, !running)}
           >
-            ⏹ Stop
+            Stop
           </button>
           {running && (
-            <span style={{ fontSize: 11, color: t.accent, alignSelf: "center", fontWeight: 700 }}>
-              ● Live
-            </span>
+            <span style={{ fontSize: 11, color: t.accent, fontWeight: 700 }}>Live</span>
           )}
+          <span style={{ marginLeft: "auto", fontSize: 11, color: t.textSoft }}>{selected.size} selected</span>
         </div>
 
-        {/* Selected count */}
-        <div style={{ padding: "6px 16px", fontSize: 11, color: t.textSoft, borderBottom: `1px solid ${t.border}` }}>
-          {selected.size} vehicle{selected.size !== 1 ? "s" : ""} selected
-        </div>
-
-        {/* Vehicle list */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
-          {loading && <div style={{ padding: 16, color: t.textSoft, fontSize: 12 }}>Loading vehicles…</div>}
+        {/* Vehicle groups */}
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {loading && <div style={{ padding: 16, color: t.textSoft, fontSize: 12 }}>Loading vehicles...</div>}
           {error && <div style={{ padding: 16, color: t.red, fontSize: 12 }}>{error}</div>}
-          {filtered.map(v => {
-            const st = s[v.devIdno];
-            const isSelected = selected.has(v.devIdno);
-            const online = st?.online;
-            const gpsValid = st?.gpsValid;
-            const ago = agoLabel(st?.gpsTime);
+
+          {groups.map(([groupName, vehicles]) => {
+            const expanded = expandedGroups.has(groupName);
+            const allIn = vehicles.every(v => selected.has(v.devIdno));
+            const someIn = vehicles.some(v => selected.has(v.devIdno));
 
             return (
-              <div
-                key={v.devIdno}
-                onClick={() => toggleSelect(v.devIdno)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "8px 16px",
-                  cursor: "pointer",
-                  background: isSelected ? t.accentSoft : "transparent",
-                  borderLeft: `3px solid ${isSelected ? t.accent : "transparent"}`,
-                  transition: "background 0.12s",
-                }}
-              >
-                <div style={{
-                  width: 14, height: 14, borderRadius: 3,
-                  border: `2px solid ${isSelected ? t.accent : t.border}`,
-                  background: isSelected ? t.accent : "transparent",
-                  flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  {isSelected && <span style={{ color: "#fff", fontSize: 10, lineHeight: 1 }}>✓</span>}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 12, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {v.plate}
+              <div key={groupName}>
+                {/* Group header */}
+                <div
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    padding: "8px 14px", cursor: "pointer",
+                    background: t.panelBright, borderBottom: `1px solid ${t.border}`,
+                    position: "sticky", top: 0, zIndex: 1,
+                  }}
+                >
+                  {/* Group checkbox */}
+                  <div
+                    onClick={() => toggleGroup(groupName, vehicles)}
+                    style={{
+                      width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                      border: `2px solid ${allIn ? t.accent : someIn ? t.accent : t.border}`,
+                      background: allIn ? t.accent : someIn ? t.accentSoft : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+                    }}
+                  >
+                    {allIn && <span style={{ color: "#fff", fontSize: 10, lineHeight: 1 }}>✓</span>}
+                    {!allIn && someIn && <span style={{ color: t.accent, fontSize: 10, lineHeight: 1 }}>–</span>}
                   </div>
-                  {st && (
-                    <div style={{ fontSize: 10, marginTop: 2 }}>
-                      {!gpsValid
-                        ? <span style={{ color: t.muted }}>GPS invalid</span>
-                        : online
-                        ? <span style={{ color: t.green }}>● Online{st.speed != null ? ` · ${st.speed.toFixed(0)} km/h` : ""}</span>
-                        : <span style={{ color: t.orange }}>● Offline{ago ? ` · ${ago}` : ""}</span>
-                      }
-                    </div>
-                  )}
+
+                  {/* Expand toggle */}
+                  <div
+                    onClick={() => setExpandedGroups(prev => {
+                      const next = new Set(prev);
+                      next.has(groupName) ? next.delete(groupName) : next.add(groupName);
+                      return next;
+                    })}
+                    style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <span style={{ fontSize: 10, color: t.muted, transition: "transform 0.15s", display: "inline-block", transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+                    <span style={{ fontWeight: 700, fontSize: 11, color: t.text, textTransform: "uppercase", letterSpacing: "0.04em" }}>{groupName}</span>
+                    <span style={{ fontSize: 10, color: t.muted, marginLeft: "auto" }}>{vehicles.length}</span>
+                  </div>
                 </div>
+
+                {/* Vehicle rows */}
+                {expanded && vehicles.map(v => {
+                  const st = statuses[v.devIdno];
+                  const isSelected = selected.has(v.devIdno);
+                  const online = st?.online;
+                  const ago = agoLabel(st?.gpsTime);
+                  const dotColor = !st ? t.border : !st.gpsValid ? t.muted : online ? t.green : t.orange;
+
+                  return (
+                    <div
+                      key={v.devIdno}
+                      onClick={() => toggleSelect(v.devIdno)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 10,
+                        padding: "7px 14px 7px 36px", cursor: "pointer",
+                        background: isSelected ? t.accentSoft : "transparent",
+                        borderLeft: `3px solid ${isSelected ? t.accent : "transparent"}`,
+                        borderBottom: `1px solid ${t.border}`,
+                      }}
+                    >
+                      <div style={{
+                        width: 13, height: 13, borderRadius: 3, flexShrink: 0,
+                        border: `2px solid ${isSelected ? t.accent : t.border}`,
+                        background: isSelected ? t.accent : "transparent",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        {isSelected && <span style={{ color: "#fff", fontSize: 9, lineHeight: 1 }}>✓</span>}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 12, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {v.plate}
+                        </div>
+                        {st && (
+                          <div style={{ fontSize: 10, marginTop: 1, display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0, display: "inline-block" }} />
+                            {!st.gpsValid
+                              ? <span style={{ color: t.muted }}>GPS invalid</span>
+                              : online
+                              ? <span style={{ color: t.green }}>Online{st.speed != null ? ` · ${st.speed.toFixed(0)} km/h` : ""}</span>
+                              : <span style={{ color: t.orange }}>Offline{ago ? ` · ${ago}` : ""}</span>
+                            }
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
@@ -324,12 +411,7 @@ export default function LiveMap({ user }) {
 
       {/* Map area */}
       <div style={{ flex: 1, position: "relative", background: "#e8eaed" }}>
-        {/* Leaflet CSS */}
-        <link
-          rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
-        />
-        {/* Leaflet JS loaded inline */}
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
         <LeafletLoader />
 
         {!running && selected.size === 0 && (
@@ -341,17 +423,13 @@ export default function LiveMap({ user }) {
               background: "rgba(255,255,255,0.92)", borderRadius: 16, padding: "24px 36px",
               textAlign: "center", boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
             }}>
-              <div style={{ fontSize: 36, marginBottom: 8 }}>🗺️</div>
               <div style={{ fontWeight: 700, fontSize: 15, color: t.text }}>Select vehicles, then press Start</div>
               <div style={{ fontSize: 12, color: t.textSoft, marginTop: 6 }}>Live locations update every 8 seconds</div>
             </div>
           </div>
         )}
 
-        <div
-          ref={mapRef}
-          style={{ width: "100%", height: "100%" }}
-        />
+        <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
       </div>
     </div>
   );
@@ -369,16 +447,11 @@ function LeafletLoader() {
 
 function btnStyle(t, color, disabled = false) {
   return {
-    flex: 1,
-    padding: "6px 0",
-    borderRadius: 7,
-    border: "none",
+    flex: 1, padding: "6px 0", borderRadius: 7, border: "none",
     background: disabled ? t.border : color,
     color: disabled ? t.textSoft : "#fff",
-    fontWeight: 700,
-    fontSize: 12,
+    fontWeight: 700, fontSize: 12,
     cursor: disabled ? "not-allowed" : "pointer",
-    transition: "opacity 0.15s",
     opacity: disabled ? 0.6 : 1,
   };
 }

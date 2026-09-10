@@ -94,13 +94,14 @@ exports.liveMap = async (req, res) => {
   try {
     const statuses = await cms.getAllGPS().catch(() => []);
     ok(res, statuses.map(v => ({
-      devIdno: String(v.devIdno || v.id || ''),
-      plate:   v.plate || v.nm || v.abbr || String(v.devIdno || v.id || ''),
-      lat:     v.lat ?? null,
-      lng:     v.lng ?? null,
-      online:  (v.ol ?? v.online ?? 0) !== 0,
-      gpsTime: v.gpsTime ?? v.gt ?? null,
-      speed:   v.speed ?? null,
+      devIdno:  String(v.devIdno || v.id || ''),
+      plate:    v.plate || v.nm || v.abbr || String(v.devIdno || v.id || ''),
+      group:    v.pnm  || null,
+      lat:      v.lat  ?? null,
+      lng:      v.lng  ?? null,
+      online:   (v.ol ?? v.online ?? 0) !== 0,
+      gpsTime:  v.gpsTime ?? v.gt ?? null,
+      speed:    v.speed   ?? null,
       gpsValid: v.lat != null && v.lng != null && (Math.abs(v.lat) > 0.001 || Math.abs(v.lng) > 0.001),
     })));
   } catch (e) { err(res, e.message, 500); }
