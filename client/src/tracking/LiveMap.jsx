@@ -114,7 +114,6 @@ export default function LiveMap({ user }) {
       if (!v || v.lat == null || v.lng == null) continue;
 
       const online = !!v.online;
-      const online = v.online;
       const gpsOk = v.gpsValid && v.gpsLocked !== false;
       const unconfirmed = online && !gpsOk; // online but no GPS lock
       const ago = agoLabel(v.gpsTime);
