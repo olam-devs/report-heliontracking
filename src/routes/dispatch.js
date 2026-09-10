@@ -30,7 +30,7 @@ function mapVehicle(v) {
     (Math.abs(v.lat) > 0.001 || Math.abs(v.lng) > 0.001);
   const gpsUntargeted = (v.s2 != null) ? ((v.s2 & 0x40000) !== 0) : false;
   const satellites = v.satellites ?? null;
-  const gpsLocked = gpsUntargeted ? false : satellites != null ? satellites > 0 : hasFix;
+  const gpsLocked = gpsUntargeted ? false : hasFix;
   return {
     devIdno:  String(v.devIdno || v.id || ''),
     plate:    v.plate || v.nm || v.abbr || String(v.devIdno || v.id || ''),
