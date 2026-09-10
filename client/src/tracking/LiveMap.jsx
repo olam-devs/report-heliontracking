@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { apiFetch } from "./api.js";
 import { useTheme } from "./theme.jsx";
+
+async function fetchDispatch() {
+  const token = localStorage.getItem('token');
+  const res = await fetch('/api/dispatch/live-map', {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`);
+  return json.data;
+}
 
 const POLL_MS = 8000;
 
@@ -50,7 +59,7 @@ export default function LiveMap({ user }) {
   const searchRef = useRef(null);
 
   useEffect(() => {
-    apiFetch("/live-map")
+    fetchDispatch()
       .then(data => {
         const vehicles = data || [];
         setAllVehicles(vehicles);
@@ -139,7 +148,7 @@ export default function LiveMap({ user }) {
   const fetchAndUpdate = useCallback(async () => {
     if (selected.size === 0) return;
     try {
-      const data = await apiFetch("/live-map");
+      const data = await fetchDispatch();
       const byId = {};
       for (const v of data) byId[v.devIdno] = v;
       setStatuses(byId);

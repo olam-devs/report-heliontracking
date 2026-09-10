@@ -41,6 +41,7 @@ app.use('/api/roles',           require('./src/routes/customRoles'));
 app.use('/api/cases/:caseId/report', require('./src/routes/caseReports'));
 app.use('/api/tracking', require('./src/routes/tracking'));
 app.use('/api/mechanic', require('./src/routes/mechanic'));
+app.use('/api/dispatch', require('./src/routes/dispatch'));
 
 const { startNotificationScanner } = require('./src/tracking/notification-scanner.service');
 const db = require('./src/config/db');
