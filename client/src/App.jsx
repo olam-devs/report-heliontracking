@@ -11,6 +11,7 @@ import ReportEditor from './pages/ReportEditor';
 import ReportTemplates from './pages/ReportTemplates';
 import Layout from './components/Layout';
 import MechanicPortal from './pages/MechanicPortal';
+import DispatchPage from './pages/DispatchPage';
 import api from './api/client';
 import toast from 'react-hot-toast';
 import TrackingPortal, {
@@ -65,6 +66,7 @@ function AppRoutes() {
         <Route path="report-templates" element={<NonMechanicRoute><ReportTemplates /></NonMechanicRoute>} />
         <Route path="users" element={<NonMechanicRoute><Users /></NonMechanicRoute>} />
         <Route path="mechanic" element={<MechanicRoute><MechanicPortal /></MechanicRoute>} />
+        <Route path="dispatch" element={<DispatchPage />} />
         <Route path="tracking" element={<ProtectedRoute><TrackingRoute><TrackingPortal /></TrackingRoute></ProtectedRoute>}>
           <Route index element={<TrackingDailyReport />} />
           <Route path="fuel-alerts" element={<TrackingFuelAlerts />} />

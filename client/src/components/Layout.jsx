@@ -1,8 +1,34 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/client';
 import toast from 'react-hot-toast';
+
+function usePWAInstall() {
+  const promptRef = useRef(null);
+  const [canInstall, setCanInstall] = useState(false);
+
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      promptRef.current = e;
+      setCanInstall(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', () => setCanInstall(false));
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const install = async () => {
+    if (!promptRef.current) return;
+    promptRef.current.prompt();
+    const { outcome } = await promptRef.current.userChoice;
+    if (outcome === 'accepted') setCanInstall(false);
+    promptRef.current = null;
+  };
+
+  return { canInstall, install };
+}
 
 const navLink = (collapsed) => ({ isActive }) =>
   `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -31,6 +57,7 @@ const ICONS = {
   users:   'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
   templates:'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z',
   tracking:'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7',
+  dispatch:'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z',
   mechanic:'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
   logout:  'M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1',
   collapse:'M11 19l-7-7 7-7m8 14l-7-7 7-7',
@@ -43,7 +70,9 @@ export default function Layout() {
   const isAdmin = user?.role === 'admin';
   const isMechanic = user?.role === 'mechanic';
   const canTrack = isAdmin || user?.can_view_tracking;
+  const canDispatch = isAdmin || user?.can_view_dispatch || user?.can_view_tracking;
   const canMechanic = isAdmin || isMechanic;
+  const { canInstall, install } = usePWAInstall();
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebar_collapsed') === '1'; } catch { return false; }
   });
@@ -96,13 +125,24 @@ export default function Layout() {
             <img src="/logo.svg" alt="" style={{ height: '28px', width: 'auto', filter: 'brightness(0) invert(1)' }} />
             <span className="text-sm font-semibold text-white/80">Mechanic Portal</span>
           </div>
-          <button onClick={handleLogout}
-            className="flex items-center gap-1.5 text-sm text-white/70 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.logout} />
-            </svg>
-            Logout
-          </button>
+          <div className="flex items-center gap-2">
+            {canInstall && (
+              <button onClick={install}
+                className="flex items-center gap-1.5 text-sm text-white/70 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors border border-white/20">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Install App
+              </button>
+            )}
+            <button onClick={handleLogout}
+              className="flex items-center gap-1.5 text-sm text-white/70 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.logout} />
+              </svg>
+              Logout
+            </button>
+          </div>
         </header>
         <main className="flex-1 overflow-auto">
           <Outlet />
@@ -160,6 +200,9 @@ export default function Layout() {
           {canTrack && (
             <NavItem to="/tracking" icon={ICONS.tracking} label="Fleet Tracking" collapsed={collapsed} badge={unreadNotifs} />
           )}
+          {canDispatch && (
+            <NavItem to="/dispatch" icon={ICONS.dispatch} label="Dispatch View" collapsed={collapsed} />
+          )}
           {canMechanic && (
             <NavItem to="/mechanic" icon={ICONS.mechanic} label="Mechanic" collapsed={collapsed} />
           )}
@@ -185,6 +228,18 @@ export default function Layout() {
               <div className="text-sm font-medium text-white truncate">{user?.name}</div>
               <div className="text-xs text-white/50 capitalize">{user?.role}</div>
             </div>
+          )}
+          {canInstall && (
+            <button
+              onClick={install}
+              className={`w-full flex items-center gap-2 px-2 py-2 mb-1 rounded-lg text-sm text-indigo-300 hover:bg-white/10 hover:text-indigo-200 transition-colors border border-indigo-400/30 ${collapsed ? 'justify-center' : ''}`}
+              title={collapsed ? 'Install App' : undefined}
+            >
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              {!collapsed && 'Install App'}
+            </button>
           )}
           <button
             onClick={handleLogout}
