@@ -3,6 +3,7 @@ import { apiFetch, getToken } from "./api.js";
 import Login from "./Login.jsx";
 import DailyReport from "./DailyReport.jsx";
 import UsersAdmin from "./UsersAdmin.jsx";
+import LiveMap from "./LiveMap.jsx";
 import { Spinner } from "./ui/primitives.jsx";
 
 export default function App() {
@@ -33,13 +34,14 @@ export default function App() {
 
   const route = typeof window !== "undefined" ? window.location.pathname.replace(/\/$/, "") : "";
   const isUsersAdmin = route === "/admin/users";
+  const isLiveMap = route === "/live-map";
 
   return (
     <div
       style={{
         maxWidth: isUsersAdmin ? 1400 : "100%",
         margin: "0 auto",
-        padding: isUsersAdmin ? "16px 20px 40px" : "8px 12px 12px",
+        padding: isUsersAdmin ? "16px 20px 40px" : isLiveMap ? "0" : "8px 12px 12px",
         height: isUsersAdmin ? undefined : "100vh",
         boxSizing: "border-box",
         display: isUsersAdmin ? "block" : "flex",
@@ -49,6 +51,8 @@ export default function App() {
     >
       {isUsersAdmin ? (
         <UsersAdmin user={user} />
+      ) : isLiveMap ? (
+        <LiveMap user={user} />
       ) : (
         <DailyReport username={user.username} user={user} />
       )}

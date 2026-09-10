@@ -8,6 +8,7 @@ const VEHICLE_PAGES = ['daily_report', 'fuel_alerts', 'calibration'];
 router.use(auth, requireTracking);
 
 router.get('/health', c.health);
+router.get('/live-map', c.liveMap);
 router.get('/page-access', c.getTrackingPageAccess);
 
 router.get('/vehicles', requireAnyTrackingPage(VEHICLE_PAGES, 'view'), c.vehicles);
