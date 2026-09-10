@@ -28,9 +28,9 @@ async function authDispatch(req, res, next) {
 function mapVehicle(v) {
   const hasFix = v.lat != null && v.lng != null &&
     (Math.abs(v.lat) > 0.001 || Math.abs(v.lng) > 0.001);
-  const pk = v.pk ?? null;
+  const gpsUntargeted = (v.s2 != null) ? ((v.s2 & 0x40000) !== 0) : false;
   const satellites = v.satellites ?? null;
-  const gpsLocked = pk != null ? pk > 0 : satellites != null ? satellites > 0 : hasFix;
+  const gpsLocked = gpsUntargeted ? false : satellites != null ? satellites > 0 : hasFix;
   return {
     devIdno:  String(v.devIdno || v.id || ''),
     plate:    v.plate || v.nm || v.abbr || String(v.devIdno || v.id || ''),
