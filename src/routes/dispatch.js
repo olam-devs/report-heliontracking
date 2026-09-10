@@ -31,8 +31,13 @@ router.get('/live-map', authDispatch, async (req, res) => {
       data: statuses.map(v => {
         const hasFix = v.lat != null && v.lng != null &&
           (Math.abs(v.lat) > 0.001 || Math.abs(v.lng) > 0.001);
-        const satellites = v.satellites ?? v.ns ?? null;
-        const gpsLocked = satellites == null ? hasFix : satellites > 0;
+        const satellites = v.satellites ?? (v.ns != null ? v.ns : null);
+        // accOn uses JT/T 808 s1 bit-1 which on these devices = GPS positioning status
+        const accOn = v.accOn ?? null;
+        // gpsLocked: use satellites if available, else accOn if available, else coords-only
+        const gpsLocked = satellites != null ? satellites > 0
+                        : accOn != null      ? accOn
+                        : hasFix;
         return {
           devIdno:    String(v.devIdno || v.id || ''),
           plate:      v.plate || v.nm || v.abbr || String(v.devIdno || v.id || ''),
@@ -43,6 +48,7 @@ router.get('/live-map', authDispatch, async (req, res) => {
           gpsTime:    v.gpsTime ?? v.gt ?? null,
           speed:      v.speed   ?? null,
           satellites,
+          accOn,
           gpsValid:   hasFix && gpsLocked,
           gpsLocked,
         };

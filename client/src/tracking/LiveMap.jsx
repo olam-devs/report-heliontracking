@@ -125,14 +125,14 @@ export default function LiveMap({ user }) {
 
       let labelHtml;
       if (unconfirmed) {
-        // Online but GPS not yet locked — amber warning with striped border
-        labelHtml = `<div style="background:#fff3cd;color:#7c5a00;font-size:13px;font-weight:800;font-family:system-ui,sans-serif;padding:5px 11px;border-radius:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px dashed #f5a623;line-height:1.4;">${v.plate}<span style="font-size:10px;font-weight:600;margin-left:6px;color:#c17900">⚠ GPS?</span></div>`;
+        labelHtml = `<div style="background:#fff3cd;color:#7c5a00;font-size:13px;font-weight:800;font-family:system-ui,sans-serif;padding:5px 11px;border-radius:12px;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,0.35);border:2px dashed #f5a623;line-height:1.4;">${v.plate} <span style="font-size:10px;font-weight:600;color:#c17900">⚠ GPS?</span></div>`;
       } else if (!gpsOk) {
-        // Completely invalid GPS
-        labelHtml = `<div style="background:#e0e0e0;color:#555;font-size:13px;font-weight:700;font-family:system-ui,sans-serif;padding:5px 10px;border-radius:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px solid #9e9e9e;line-height:1.4;opacity:0.8;">${v.plate}<span style="font-size:10px;font-weight:500;margin-left:5px;color:#888">No GPS</span></div>`;
+        labelHtml = `<div style="background:#f5f5f5;color:#666;font-size:13px;font-weight:700;font-family:system-ui,sans-serif;padding:5px 10px;border-radius:12px;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,0.25);border:2px solid #bbb;line-height:1.4;">${v.plate} <span style="font-size:10px;color:#999">No GPS</span></div>`;
       } else {
-        const color = online ? "#3daf7a" : "#f57c00";
-        labelHtml = `<div style="background:${color};color:#fff;font-size:13px;font-weight:800;font-family:system-ui,sans-serif;padding:5px 11px;border-radius:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.35);border:2px solid rgba(255,255,255,0.7);line-height:1.4;">${v.plate}</div>`;
+        const borderColor = online ? "#1e7e50" : "#c26000";
+        const bgColor = online ? "#ffffff" : "#ffffff";
+        const txtColor = online ? "#1a6640" : "#9a4800";
+        labelHtml = `<div style="background:${bgColor};color:${txtColor};font-size:13px;font-weight:800;font-family:system-ui,sans-serif;padding:5px 11px;border-radius:12px;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,0.3);border:3px solid ${borderColor};line-height:1.4;">${v.plate}</div>`;
       }
 
       const color = unconfirmed ? "#f5a623" : !gpsOk ? "#9e9e9e" : online ? "#3daf7a" : "#f57c00";
@@ -395,6 +395,14 @@ export default function LiveMap({ user }) {
                     <div
                       key={v.devIdno}
                       onClick={() => toggleSelect(v.devIdno)}
+                      onDoubleClick={() => {
+                        const cur = statuses[v.devIdno] || v;
+                        if (cur?.lat != null && cur?.lng != null && leafletRef.current) {
+                          leafletRef.current.flyTo([cur.lat, cur.lng], 16, { duration: 1 });
+                          markersRef.current[v.devIdno]?.openPopup();
+                        }
+                      }}
+                      title="Double-click to zoom to vehicle"
                       style={{
                         display: "flex", alignItems: "center", gap: 10,
                         padding: "7px 14px 7px 36px", cursor: "pointer",
