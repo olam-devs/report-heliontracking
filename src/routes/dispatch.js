@@ -2,6 +2,7 @@ const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const UserModel = require('../models/UserModel');
 const cms = require('../tracking/lib/services/cmsv6.service');
+const geocode = require('../tracking/lib/utils/geocode-cache');
 
 async function authDispatch(req, res, next) {
   const header = req.headers.authorization;
@@ -57,6 +58,28 @@ router.get('/live-map', authDispatch, async (req, res) => {
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
+});
+
+// Reverse geocode a lat/lng — uses cached Nominatim lookups
+router.get('/geocode', authDispatch, async (req, res) => {
+  const lat = parseFloat(req.query.lat);
+  const lng = parseFloat(req.query.lng);
+  if (isNaN(lat) || isNaN(lng)) return res.json({ name: null });
+  try {
+    const name = await geocode.resolve(lat, lng);
+    res.json({ name: name || null });
+  } catch { res.json({ name: null }); }
+});
+
+// Debug: raw CMSV fields for a specific plate (admin only)
+router.get('/raw/:plate', authDispatch, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    const all = await cms.getAllGPS().catch(() => []);
+    const v = all.find(x => (x.plate || x.vid || x.abbr || '').toLowerCase() === req.params.plate.toLowerCase());
+    if (!v) return res.json({ found: false });
+    res.json({ found: true, raw: v });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = router;

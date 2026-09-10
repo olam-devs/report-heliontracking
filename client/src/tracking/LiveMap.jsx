@@ -144,13 +144,36 @@ export default function LiveMap({ user }) {
 
       const satInfo = v.satellites != null ? ` · ${v.satellites} sat` : "";
       const warningLine = unconfirmed ? `<br/><span style="background:#fff3cd;color:#7c5a00;font-size:11px;padding:2px 6px;border-radius:4px;font-weight:600;">⚠ GPS not locked — position may be inaccurate${satInfo}</span>` : "";
-      const popup = `<div style="font-family:system-ui,sans-serif;font-size:13px;min-width:160px"><b style="font-size:14px">${v.plate}</b><br/><span style="color:${color};font-weight:600">${statusLine}</span>${warningLine}<br/><span style="color:#666;font-size:11px">${v.lat.toFixed(6)}, ${v.lng.toFixed(6)}</span>${v.gpsTime ? `<br/><span style="color:#666;font-size:11px">GPS: ${new Date(v.gpsTime).toLocaleTimeString()}</span>` : ""}</div>`;
+      const movingStatus = gpsOk ? (v.speed != null && v.speed > 1 ? "Driving" : "Parked") : null;
+      const movingLine = movingStatus ? `<br/><span style="font-size:11px;color:#444">Status: <b>${movingStatus}</b></span>` : "";
+      const locId = `loc-${id}`;
+      const popup = `<div style="font-family:system-ui,sans-serif;font-size:13px;min-width:180px"><b style="font-size:14px">${v.plate}</b><br/><span style="color:${color};font-weight:600">${statusLine}</span>${warningLine}${movingLine}<br/><span id="${locId}" style="color:#444;font-size:12px">Loading location...</span>${v.gpsTime ? `<br/><span style="color:#999;font-size:11px">Last GPS: ${new Date(v.gpsTime).toLocaleTimeString()}</span>` : ""}</div>`;
+
+      const fillLocation = (lat, lng, elemId) => {
+        const token = localStorage.getItem('token');
+        fetch(`/api/dispatch/geocode?lat=${lat}&lng=${lng}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+          .then(r => r.json())
+          .then(d => {
+            const el = document.getElementById(elemId);
+            if (el) el.textContent = d.name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+          })
+          .catch(() => {
+            const el = document.getElementById(elemId);
+            if (el) el.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+          });
+      };
 
       if (markersRef.current[id]) {
         markersRef.current[id].setLatLng([v.lat, v.lng]).setIcon(icon).setPopupContent(popup);
       } else {
-        markersRef.current[id] = L.marker([v.lat, v.lng], { icon }).addTo(map).bindPopup(popup);
+        const marker = L.marker([v.lat, v.lng], { icon }).addTo(map).bindPopup(popup);
+        marker.on('popupopen', () => fillLocation(v.lat, v.lng, locId));
+        markersRef.current[id] = marker;
       }
+      // refresh location label when popup is already open and data refreshes
+      if (markersRef.current[id].isPopupOpen()) fillLocation(v.lat, v.lng, locId);
       bounds.push([v.lat, v.lng]);
     }
 
