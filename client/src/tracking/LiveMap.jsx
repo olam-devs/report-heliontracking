@@ -35,9 +35,9 @@ export default function LiveMap({ user }) {
   const pollRef = useRef(null);
   const mapInitRef = useRef(false);
 
-  // Load vehicle list once
+  // Load initial vehicle list from live-map (no separate /vehicles call needed)
   useEffect(() => {
-    apiFetch("/vehicles")
+    apiFetch("/live-map")
       .then(data => {
         setAllVehicles(data || []);
         setLoading(false);
@@ -208,18 +208,27 @@ export default function LiveMap({ user }) {
         {/* Header */}
         <div style={{ padding: "14px 16px 10px", borderBottom: `1px solid ${t.border}` }}>
           <div style={{ fontWeight: 800, fontSize: 14, color: t.text, marginBottom: 8 }}>
-            Live Map
+            Dispatch View
           </div>
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search plate..."
-            style={{
-              width: "100%", boxSizing: "border-box", border: `1px solid ${t.border}`,
-              borderRadius: 8, padding: "6px 10px", fontSize: 12, color: t.text,
-              background: t.bg, outline: "none",
-            }}
-          />
+          <div style={{ position: "relative" }}>
+            <span style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: t.muted, pointerEvents: "none" }}>🔍</span>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search plate number…"
+              style={{
+                width: "100%", boxSizing: "border-box", border: `1px solid ${t.border}`,
+                borderRadius: 8, padding: "6px 10px 6px 28px", fontSize: 12, color: t.text,
+                background: t.bg, outline: "none",
+              }}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: t.muted, fontSize: 14, lineHeight: 1 }}
+              >×</button>
+            )}
+          </div>
           <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
             <button onClick={selectAll} style={btnStyle(t, "#5c6b7a")}>
               Select All

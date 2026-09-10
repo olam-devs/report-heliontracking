@@ -43,6 +43,14 @@ app.use('/api/tracking', require('./src/routes/tracking'));
 app.use('/api/mechanic', require('./src/routes/mechanic'));
 
 const { startNotificationScanner } = require('./src/tracking/notification-scanner.service');
+const db = require('./src/config/db');
+async function runStartupMigrations() {
+  try {
+    await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_dispatch TINYINT(1) NOT NULL DEFAULT 0`);
+  } catch (e) {
+    if (!e.message?.includes('Duplicate column')) console.error('[migration] can_view_dispatch:', e.message);
+  }
+}
 const dailyLog = require('./src/tracking/lib/services/daily-log.service');
 const { purgeAllUncalibratedNotifications, purgeMalformedNotifications } = require('./src/tracking/fuel-insights.engine');
 const { rebuildDangerZonesFromNotifications } = require('./src/tracking/danger-zones.service');
@@ -66,6 +74,7 @@ app.use((req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Fleet Incident Reporter  →  http://localhost:${PORT} (${isProd ? 'production' : 'development'})`);
+  runStartupMigrations().catch(console.error);
   setImmediate(() => {
     try {
       dailyLog.refreshVehicleMetaFromDisk();

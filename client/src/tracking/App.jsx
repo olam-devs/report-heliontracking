@@ -34,7 +34,16 @@ export default function App() {
 
   const route = typeof window !== "undefined" ? window.location.pathname.replace(/\/$/, "") : "";
   const isUsersAdmin = route === "/admin/users";
-  const isLiveMap = route === "/live-map";
+  const isLiveMap = route === "/live-map" || route === "/dispatch";
+
+  // Dispatch-only users land on /dispatch automatically
+  useEffect(() => {
+    if (!user) return;
+    const onDailyReport = !isUsersAdmin && !isLiveMap;
+    if (onDailyReport && !user.can_view_tracking && user.can_view_dispatch) {
+      window.location.replace("/dispatch");
+    }
+  }, [user, isUsersAdmin, isLiveMap]);
 
   return (
     <div

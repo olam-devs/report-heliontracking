@@ -5,10 +5,18 @@ const c = require('../controllers/trackingController');
 
 const VEHICLE_PAGES = ['daily_report', 'fuel_alerts', 'calibration'];
 
+const requireDispatch = (req, res, next) => {
+  if (req.user?.role === 'admin' || req.user?.can_view_tracking || req.user?.can_view_dispatch) return next();
+  return res.status(403).json({ success: false, error: 'Dispatch access required' });
+};
+
+// Dispatch-only routes (auth + dispatch permission, no full tracking required)
+router.get('/live-map', auth, requireDispatch, c.liveMap);
+
+// All other tracking routes require full tracking access
 router.use(auth, requireTracking);
 
 router.get('/health', c.health);
-router.get('/live-map', c.liveMap);
 router.get('/page-access', c.getTrackingPageAccess);
 
 router.get('/vehicles', requireAnyTrackingPage(VEHICLE_PAGES, 'view'), c.vehicles);

@@ -105,6 +105,7 @@ function UserModal({ user, drivers, cases, roles, onClose, onSave }) {
     is_active:             user?.is_active !== false,
     can_edit_reports:      user?.can_edit_reports || false,
     can_view_tracking:     user?.can_view_tracking || false,
+    can_view_dispatch:     user?.can_view_dispatch || false,
     tracking_page_access:  user?.tracking_page_access || defaultTrackingPageAccess(),
     can_create_cases:      user?.can_create_cases !== false,
     can_edit_cases:        user?.can_edit_cases !== false,
@@ -140,6 +141,7 @@ function UserModal({ user, drivers, cases, roles, onClose, onSave }) {
         is_active: form.is_active,
         can_edit_reports:      form.can_edit_reports,
         can_view_tracking:     form.can_view_tracking,
+        can_view_dispatch:     form.can_view_dispatch,
         tracking_page_access:  form.can_view_tracking ? form.tracking_page_access : null,
         can_create_cases:      form.can_create_cases,
         can_edit_cases:        form.can_edit_cases,
@@ -250,6 +252,7 @@ function UserModal({ user, drivers, cases, roles, onClose, onSave }) {
                   { key: 'can_download_evidence', label: 'Download evidence files' },
                   { key: 'can_edit_reports',  label: 'Create & publish official reports' },
                   { key: 'can_view_tracking', label: 'Access Tracking / Daily Fleet Report' },
+                  { key: 'can_view_dispatch', label: 'Access Dispatch View (live vehicle map)' },
                 ].map(({ key, label }) => (
                   <label key={key} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${form[key] && !isAdmin ? 'border-brand-300 bg-brand-50' : 'border-gray-200 hover:bg-gray-50'} ${isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <input
