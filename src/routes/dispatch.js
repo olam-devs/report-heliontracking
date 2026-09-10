@@ -32,25 +32,23 @@ router.get('/live-map', authDispatch, async (req, res) => {
       data: statuses.map(v => {
         const hasFix = v.lat != null && v.lng != null &&
           (Math.abs(v.lat) > 0.001 || Math.abs(v.lng) > 0.001);
-        const satellites = v.satellites ?? (v.ns != null ? v.ns : null);
-        // accOn uses JT/T 808 s1 bit-1 which on these devices = GPS positioning status
-        const accOn = v.accOn ?? null;
-        // gpsLocked: use satellites if available, else accOn if available, else coords-only
-        const gpsLocked = satellites != null ? satellites > 0
-                        : accOn != null      ? accOn
+        // pk = CMSV GPS positioning quality: 0 means no satellite fix (untargeted), non-zero = real position
+        const pk = v.pk ?? null;
+        const satellites = v.satellites ?? null;
+        const gpsLocked = pk != null     ? pk > 0
+                        : satellites != null ? satellites > 0
                         : hasFix;
         return {
-          devIdno:    String(v.devIdno || v.id || ''),
-          plate:      v.plate || v.nm || v.abbr || String(v.devIdno || v.id || ''),
-          group:      v.pnm  || null,
-          lat:        v.lat  ?? null,
-          lng:        v.lng  ?? null,
-          online:     (v.ol ?? v.online ?? 0) !== 0,
-          gpsTime:    v.gpsTime ?? v.gt ?? null,
-          speed:      v.speed   ?? null,
+          devIdno:   String(v.devIdno || v.id || ''),
+          plate:     v.plate || v.nm || v.abbr || String(v.devIdno || v.id || ''),
+          group:     v.pnm  || null,
+          lat:       v.lat  ?? null,
+          lng:       v.lng  ?? null,
+          online:    (v.ol ?? v.online ?? 0) !== 0,
+          gpsTime:   v.gpsTime ?? v.gt ?? null,
+          speed:     v.speed   ?? null,
           satellites,
-          accOn,
-          gpsValid:   hasFix && gpsLocked,
+          gpsValid:  hasFix && gpsLocked,
           gpsLocked,
         };
       }),
