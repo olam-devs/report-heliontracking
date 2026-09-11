@@ -101,6 +101,7 @@ export default function LiveMap({ user }) {
   const [copiedId, setCopiedId] = useState(null);
   const [linkSearch, setLinkSearch] = useState("");
   const [linkFocused, setLinkFocused] = useState(null); // devIdno of last-toggled vehicle in link form
+  const [linkFocusedLocation, setLinkFocusedLocation] = useState(null);
 
   const mapRef = useRef(null);
   const leafletRef = useRef(null);
@@ -616,9 +617,13 @@ export default function LiveMap({ user }) {
                         <div onClick={() => {
                           setLinkVehicles(prev => { const n = new Set(prev); checked ? n.delete(v.devIdno) : n.add(v.devIdno); return n; });
                           setLinkFocused(v.devIdno);
+                          setLinkFocusedLocation(null);
                           if (st?.lat != null && st?.lng != null && leafletRef.current) {
                             leafletRef.current.flyTo([st.lat, st.lng], 16, { duration: 1 });
                             if (isMobile) setDrawerSnap('peek');
+                            apiFetch(`/api/dispatch/geocode?lat=${st.lat}&lng=${st.lng}`)
+                              .then(r => setLinkFocusedLocation(r.name || null))
+                              .catch(() => {});
                           }
                         }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0 6px 8px", cursor: "pointer", background: isFocused ? t.accentSoft : "transparent", borderRadius: 6 }}>
                           <div style={{ width: 14, height: 14, borderRadius: 3, border: `2px solid ${checked ? t.accent : t.border}`, background: checked ? t.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -633,6 +638,7 @@ export default function LiveMap({ user }) {
                             <span style={{ color: dotColor, fontWeight: 700 }}>{!isOnline ? "Offline" : !hasGps ? "No GPS" : st?.speed != null && st.speed > 1 ? `Driving · ${Math.round(st.speed)} km/h` : "Parked"}</span>
                             {!isOnline && lastSeen && <span>Last seen {lastSeen}</span>}
                             {st?.gpsTime && <span>{new Date(st.gpsTime).toLocaleString()}</span>}
+                            {linkFocusedLocation && <span style={{ width: "100%", color: t.muted }}>{linkFocusedLocation}</span>}
                           </div>
                         )}
                       </div>
