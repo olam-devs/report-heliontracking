@@ -1,0 +1,1 @@
+{"apps":[{"name":"helion-fleet-reporter","script":"C:\\helion\\_repo\\fleet-incident-reporter\\server.js","node_args":"--max-old-space-size=8192","env":{"NODE_ENV":"production","PORT":"3002"}}]}
