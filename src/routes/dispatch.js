@@ -115,6 +115,20 @@ router.get('/geocode', authDispatch, async (req, res) => {
   } catch { res.json({ name: null }); }
 });
 
+// Public reverse geocode (token validates the caller is a real link viewer)
+router.get('/public-geocode', async (req, res) => {
+  const lat = parseFloat(req.query.lat);
+  const lng = parseFloat(req.query.lng);
+  const token = req.query.token;
+  if (isNaN(lat) || isNaN(lng) || !token) return res.json({ name: null });
+  try {
+    const [rows] = await db.query('SELECT id FROM dispatch_links WHERE token = ?', [token]);
+    if (!rows.length) return res.json({ name: null });
+    const name = await geocode.resolve(lat, lng);
+    res.json({ name: name || null });
+  } catch { res.json({ name: null }); }
+});
+
 // ── Dispatch Links (shareable, time-limited, no-auth) ───────────────────────
 
 // List links (admin only)

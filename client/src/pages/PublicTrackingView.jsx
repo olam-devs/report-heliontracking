@@ -142,13 +142,23 @@ export default function PublicTrackingView() {
       }
 
       const movingStatus = gpsOk ? (v.speed != null && v.speed > 1 ? "Driving" : "Parked") : null;
-      const popup = `<div style="font-family:system-ui,sans-serif;font-size:13px;min-width:160px"><b style="font-size:14px">${v.plate}</b><br/><span style="color:${color};font-weight:600">${statusLine}</span>${movingStatus ? `<br/><span style="font-size:11px;color:#444">Status: <b>${movingStatus}</b></span>` : ""}${unconfirmed ? `<br/><span style="background:#fff3cd;color:#7c5a00;font-size:11px;padding:2px 6px;border-radius:4px;">⚠ GPS not locked</span>` : ""}${v.gpsTime ? `<br/><span style="color:#999;font-size:11px">Last GPS: ${new Date(v.gpsTime).toLocaleTimeString()}</span>` : ""}</div>`;
+      const locId = `pub-loc-${id}`;
+      const popup = `<div style="font-family:system-ui,sans-serif;font-size:13px;min-width:160px"><b style="font-size:14px">${v.plate}</b><br/><span style="color:${color};font-weight:600">${statusLine}</span>${movingStatus ? `<br/><span style="font-size:11px;color:#444">Status: <b>${movingStatus}</b></span>` : ""}${unconfirmed ? `<br/><span style="background:#fff3cd;color:#7c5a00;font-size:11px;padding:2px 6px;border-radius:4px;">⚠ GPS not locked</span>` : ""}${gpsOk ? `<br/><span id="${locId}" style="color:#444;font-size:12px">Loading location...</span>` : ""}${v.gpsTime ? `<br/><span style="color:#999;font-size:11px">Last GPS: ${new Date(v.gpsTime).toLocaleTimeString()}</span>` : ""}</div>`;
 
       const icon = window.L.divIcon({ className: "", html: labelHtml, iconAnchor: [0, 0] });
       if (markersRef.current[id]) {
         markersRef.current[id].setLatLng([v.lat, v.lng]).setIcon(icon).setPopupContent(popup);
       } else {
-        markersRef.current[id] = window.L.marker([v.lat, v.lng], { icon }).addTo(map).bindPopup(popup);
+        const marker = window.L.marker([v.lat, v.lng], { icon }).addTo(map).bindPopup(popup);
+        if (gpsOk) {
+          marker.on('popupopen', () => {
+            fetch(`${BASE}/api/dispatch/public-geocode?lat=${v.lat}&lng=${v.lng}&token=${token}`)
+              .then(r => r.json())
+              .then(d => { const el = document.getElementById(locId); if (el) el.textContent = d.name || `${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}`; })
+              .catch(() => { const el = document.getElementById(locId); if (el) el.textContent = `${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}`; });
+          });
+        }
+        markersRef.current[id] = marker;
       }
       bounds.push([v.lat, v.lng]);
     }
