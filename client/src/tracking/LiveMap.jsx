@@ -308,7 +308,7 @@ export default function LiveMap({ user }) {
   // ── Link management helpers ───────────────────────────────────────────────
   function openNewLink() {
     setLinkForm('new');
-    setLinkName(""); setLinkStartsAt(""); setLinkEndsAt("");
+    setLinkName(""); setLinkStartsAt(new Date(new Date().getTime() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)); setLinkEndsAt("");
     setLinkVehicles(new Set()); setLinkMsg(null);
   }
   function openEditLink(link) {
@@ -555,12 +555,12 @@ export default function LiveMap({ user }) {
                 style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${t.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 13, color: t.text, background: t.bg, outline: "none" }} />
             </label>
             <label style={{ display: "block", marginBottom: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: t.muted, marginBottom: 4, textTransform: "uppercase" }}>Start (optional — leave blank for immediate)</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: t.muted, marginBottom: 4, textTransform: "uppercase" }}>Start date &amp; time</div>
               <input type="datetime-local" value={linkStartsAt} onChange={e => setLinkStartsAt(e.target.value)}
                 style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${t.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 12, color: t.text, background: t.bg, outline: "none" }} />
             </label>
             <label style={{ display: "block", marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: t.muted, marginBottom: 4, textTransform: "uppercase" }}>End (required)</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: t.muted, marginBottom: 4, textTransform: "uppercase" }}>End date &amp; time (required)</div>
               <input type="datetime-local" value={linkEndsAt} onChange={e => setLinkEndsAt(e.target.value)}
                 style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${t.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 12, color: t.text, background: t.bg, outline: "none" }} />
             </label>

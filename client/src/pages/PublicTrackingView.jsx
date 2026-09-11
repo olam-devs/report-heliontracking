@@ -208,24 +208,13 @@ export default function PublicTrackingView() {
 
   // ── Status screens ────────────────────────────────────────────────────────
   if (state === 'loading') {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "system-ui,sans-serif", background: T.bg }}>
-        <div style={{ textAlign: "center", color: T.textSoft }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>🗺️</div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: T.text }}>Loading tracking session…</div>
-        </div>
-      </div>
-    );
+    return <Screen icon="" title="Loading tracking session…" loading />;
   }
   if (state === 'not_started') {
-    return (
-      <Screen icon="🕐" title="Tracking not started yet" sub={`This session starts on ${new Date(stateDetail).toLocaleString()}`} />
-    );
+    return <Screen icon="🕐" title="Tracking not started yet" sub={`This session begins on ${new Date(stateDetail).toLocaleString()}`} />;
   }
   if (state === 'expired') {
-    return (
-      <Screen icon="⏱️" title="Tracking session ended" sub={`This link expired on ${new Date(stateDetail).toLocaleString()}`} />
-    );
+    return <Screen icon="⏱️" title="Tracking session ended" sub={`This session expired on ${new Date(stateDetail).toLocaleString()}`} />;
   }
   if (state === 'error') {
     return <Screen icon="❌" title="Link not found" sub="This tracking link is invalid or has been removed." />;
@@ -359,13 +348,26 @@ export default function PublicTrackingView() {
   );
 }
 
-function Screen({ icon, title, sub }) {
+function Screen({ icon, title, sub, loading }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "system-ui,sans-serif", background: "#f9fafb" }}>
-      <div style={{ textAlign: "center", padding: 32, maxWidth: 360 }}>
-        <div style={{ fontSize: 52, marginBottom: 16 }}>{icon}</div>
-        <div style={{ fontWeight: 800, fontSize: 20, color: "#111827", marginBottom: 8 }}>{title}</div>
-        <div style={{ fontSize: 14, color: "#6b7280" }}>{sub}</div>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "system-ui,sans-serif", background: "linear-gradient(135deg,#f0fdf4 0%,#dcfce7 50%,#bbf7d0 100%)" }}>
+      <style>{`
+        @keyframes ht-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.7;transform:scale(0.96)} }
+        @keyframes ht-spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes ht-fade-up { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes ht-ring { 0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,0.4)} 50%{box-shadow:0 0 0 18px rgba(22,163,74,0)} }
+      `}</style>
+      <div style={{ textAlign: "center", padding: 32, maxWidth: 400, animation: "ht-fade-up 0.5s ease both" }}>
+        <div style={{ position: "relative", display: "inline-block", marginBottom: 24 }}>
+          <img src="/logo.svg" alt="Helion Tracking" style={{ width: 90, height: 90, borderRadius: "50%", background: "#fff", padding: 12, boxShadow: "0 4px 24px rgba(22,163,74,0.25)", animation: loading ? "ht-pulse 1.8s ease infinite" : "ht-ring 2.5s ease-in-out 0.3s both" }} />
+          {loading && (
+            <div style={{ position: "absolute", inset: -6, borderRadius: "50%", border: "3px solid transparent", borderTopColor: "#16a34a", borderRightColor: "#16a34a", animation: "ht-spin 1s linear infinite" }} />
+          )}
+        </div>
+        <div style={{ fontWeight: 800, fontSize: 13, color: "#16a34a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Helion Tracking</div>
+        <div style={{ fontWeight: 800, fontSize: 20, color: "#111827", marginBottom: 8, animation: "ht-fade-up 0.5s 0.15s ease both", opacity: 0 }}>{title}</div>
+        {sub && <div style={{ fontSize: 14, color: "#6b7280", animation: "ht-fade-up 0.5s 0.3s ease both", opacity: 0 }}>{sub}</div>}
+        {!loading && <div style={{ marginTop: 20, fontSize: 13, color: "#9ca3af", animation: "ht-fade-up 0.5s 0.45s ease both", opacity: 0 }}>heliontracking.com</div>}
       </div>
     </div>
   );
