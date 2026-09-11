@@ -7,7 +7,9 @@ async function apiFetch(path, opts = {}) {
     ...opts,
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...opts.headers },
   });
-  const json = await res.json();
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); } catch { throw new Error(`Server error (${res.status}): unexpected response`); }
   if (!res.ok || json.success === false) throw new Error(json.error || `HTTP ${res.status}`);
   return json;
 }
@@ -97,6 +99,8 @@ export default function LiveMap({ user }) {
   const [linkSaving, setLinkSaving] = useState(false);
   const [linkMsg, setLinkMsg] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [linkSearch, setLinkSearch] = useState("");
+  const [linkFocused, setLinkFocused] = useState(null); // devIdno of last-toggled vehicle in link form
 
   const mapRef = useRef(null);
   const leafletRef = useRef(null);
@@ -309,7 +313,7 @@ export default function LiveMap({ user }) {
   function openNewLink() {
     setLinkForm('new');
     setLinkName(""); setLinkStartsAt(new Date(new Date().getTime() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)); setLinkEndsAt("");
-    setLinkVehicles(new Set()); setLinkMsg(null);
+    setLinkVehicles(new Set()); setLinkMsg(null); setLinkSearch(""); setLinkFocused(null);
   }
   function openEditLink(link) {
     setLinkForm(link);
@@ -317,7 +321,7 @@ export default function LiveMap({ user }) {
     setLinkStartsAt(link.starts_at ? link.starts_at.slice(0, 16) : "");
     setLinkEndsAt(link.ends_at ? link.ends_at.slice(0, 16) : "");
     setLinkVehicles(new Set((link.vehicles || []).map(String)));
-    setLinkMsg(null);
+    setLinkMsg(null); setLinkSearch(""); setLinkFocused(null);
   }
   async function saveLink() {
     if (!linkName || !linkEndsAt || linkVehicles.size === 0) {
@@ -566,31 +570,61 @@ export default function LiveMap({ user }) {
             </label>
 
             <div style={{ fontSize: 11, fontWeight: 700, color: t.muted, marginBottom: 6, textTransform: "uppercase" }}>Vehicles ({linkVehicles.size} selected)</div>
-            {groupVehicles(allVehicles).map(([groupName, vehicles]) => (
-              <div key={groupName} style={{ marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${t.border}`, marginBottom: 4 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: t.muted, textTransform: "uppercase" }}>{groupName}</span>
-                  <button onClick={() => {
-                    const allIn = vehicles.every(v => linkVehicles.has(v.devIdno));
-                    setLinkVehicles(prev => { const n = new Set(prev); if (allIn) vehicles.forEach(v => n.delete(v.devIdno)); else vehicles.forEach(v => n.add(v.devIdno)); return n; });
-                  }} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, border: `1px solid ${t.border}`, background: "none", color: t.muted, cursor: "pointer" }}>
-                    {vehicles.every(v => linkVehicles.has(v.devIdno)) ? "Remove all" : "Add all"}
-                  </button>
-                </div>
-                {vehicles.map(v => {
-                  const checked = linkVehicles.has(v.devIdno);
-                  return (
-                    <div key={v.devIdno} onClick={() => setLinkVehicles(prev => { const n = new Set(prev); checked ? n.delete(v.devIdno) : n.add(v.devIdno); return n; })}
-                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0 5px 8px", cursor: "pointer" }}>
-                      <div style={{ width: 14, height: 14, borderRadius: 3, border: `2px solid ${checked ? t.accent : t.border}`, background: checked ? t.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        {checked && <span style={{ color: "#fff", fontSize: 9 }}>✓</span>}
-                      </div>
-                      <span style={{ fontSize: 12, color: t.text, fontWeight: checked ? 700 : 400 }}>{v.plate}</span>
+            <input value={linkSearch} onChange={e => setLinkSearch(e.target.value)} placeholder="Search plate…"
+              style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${t.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 12, color: t.text, background: t.bg, outline: "none", marginBottom: 10 }} />
+            {(() => {
+              const lq = linkSearch.toLowerCase();
+              const filtered = lq ? allVehicles.filter(v => (v.plate || "").toLowerCase().includes(lq)) : allVehicles;
+              return groupVehicles(filtered).map(([groupName, vehicles]) => (
+                <div key={groupName} style={{ marginBottom: 8 }}>
+                  {!lq && (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${t.border}`, marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: t.muted, textTransform: "uppercase" }}>{groupName}</span>
+                      <button onClick={() => {
+                        const allIn = vehicles.every(v => linkVehicles.has(v.devIdno));
+                        setLinkVehicles(prev => { const n = new Set(prev); if (allIn) vehicles.forEach(v => n.delete(v.devIdno)); else vehicles.forEach(v => n.add(v.devIdno)); return n; });
+                      }} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, border: `1px solid ${t.border}`, background: "none", color: t.muted, cursor: "pointer" }}>
+                        {vehicles.every(v => linkVehicles.has(v.devIdno)) ? "Remove all" : "Add all"}
+                      </button>
                     </div>
-                  );
-                })}
-              </div>
-            ))}
+                  )}
+                  {vehicles.map(v => {
+                    const checked = linkVehicles.has(v.devIdno);
+                    const st = statuses[v.devIdno];
+                    const isOnline = st?.online;
+                    const hasGps = st?.gpsValid && st?.gpsLocked !== false;
+                    const dotColor = !st ? t.border : !isOnline ? t.muted : !hasGps ? t.orange : t.green;
+                    const isFocused = linkFocused === v.devIdno;
+                    return (
+                      <div key={v.devIdno}>
+                        <div onClick={() => {
+                          setLinkVehicles(prev => { const n = new Set(prev); checked ? n.delete(v.devIdno) : n.add(v.devIdno); return n; });
+                          setLinkFocused(v.devIdno);
+                          if (st?.lat != null && st?.lng != null && leafletRef.current) {
+                            leafletRef.current.flyTo([st.lat, st.lng], 16, { duration: 1 });
+                            if (isMobile) setDrawerSnap('peek');
+                          }
+                        }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0 6px 8px", cursor: "pointer", background: isFocused ? t.accentSoft : "transparent", borderRadius: 6 }}>
+                          <div style={{ width: 14, height: 14, borderRadius: 3, border: `2px solid ${checked ? t.accent : t.border}`, background: checked ? t.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            {checked && <span style={{ color: "#fff", fontSize: 9 }}>✓</span>}
+                          </div>
+                          <div style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+                          <span style={{ fontSize: 12, color: t.text, fontWeight: checked ? 700 : 400, flex: 1 }}>{v.plate}</span>
+                          {st && <span style={{ fontSize: 10, color: t.muted }}>{st.speed != null ? `${Math.round(st.speed)} km/h` : isOnline ? "online" : "offline"}</span>}
+                        </div>
+                        {isFocused && st && (
+                          <div style={{ marginLeft: 30, marginBottom: 4, padding: "4px 8px", background: t.panelBright, borderRadius: 6, fontSize: 10, color: t.muted, display: "flex", gap: 10 }}>
+                            <span style={{ color: dotColor, fontWeight: 700 }}>{!isOnline ? "Offline" : !hasGps ? "No GPS" : "Online · GPS OK"}</span>
+                            {st.speed != null && <span>{Math.round(st.speed)} km/h</span>}
+                            {st.gpsTime && <span>{new Date(st.gpsTime * 1000).toLocaleTimeString()}</span>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ));
+            })()}
           </div>
           <div style={{ padding: "10px 14px", borderTop: `1px solid ${t.border}` }}>
             {linkMsg && <div style={{ fontSize: 11, color: linkMsg.ok ? t.green : t.red, marginBottom: 8 }}>{linkMsg.text}</div>}
@@ -698,9 +732,9 @@ export default function LiveMap({ user }) {
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 8 }}>
               <div style={{ display: "flex", gap: 0 }}>
-                {(isAdmin ? ["map", "links", "users"] : ["map"]).map(tab => (
+                {(isAdmin ? ["map", "links"] : ["map"]).map(tab => (
                   <button key={tab} onClick={() => setSideTab(tab)} style={{ padding: "5px 10px", border: "none", background: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, color: sideTab === tab ? t.accent : t.muted, borderBottom: `2px solid ${sideTab === tab ? t.accent : "transparent"}` }}>
-                    {tab === "map" ? `Vehicles${allVehicles.length > 0 ? ` (${selected.size}/${allVehicles.length})` : ""}` : tab === "links" ? "Links" : "Users"}
+                    {tab === "map" ? `Vehicles${allVehicles.length > 0 ? ` (${selected.size}/${allVehicles.length})` : ""}` : "Links"}
                   </button>
                 ))}
               </div>
@@ -714,7 +748,7 @@ export default function LiveMap({ user }) {
 
           {/* Drawer content */}
           <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column" }}>
-            {sideTab === "map" ? VehicleList : sideTab === "links" ? LinksTab : ManageUsers}
+            {sideTab === "links" ? LinksTab : VehicleList}
           </div>
         </div>
 
@@ -732,16 +766,16 @@ export default function LiveMap({ user }) {
           <div style={{ fontWeight: 800, fontSize: 14, color: t.text, marginBottom: 10 }}>Dispatch View</div>
           {isAdmin && (
             <div style={{ display: "flex", gap: 0 }}>
-              {["map", "links", "users"].map(tab => (
+              {["map", "links"].map(tab => (
                 <button key={tab} onClick={() => setSideTab(tab)} style={{ flex: 1, padding: "6px 0", border: "none", background: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, color: sideTab === tab ? t.accent : t.muted, borderBottom: `2px solid ${sideTab === tab ? t.accent : "transparent"}` }}>
-                  {tab === "map" ? "Map" : tab === "links" ? "Links" : "Users"}
+                  {tab === "map" ? "Map" : "Links"}
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        {sideTab === "links" ? LinksTab : sideTab === "users" ? ManageUsers : (
+        {sideTab === "links" ? LinksTab : (
           <>
             <div style={{ padding: "10px 14px 0", borderBottom: `1px solid ${t.border}` }}>
               <div style={{ position: "relative" }} ref={searchRef}>
