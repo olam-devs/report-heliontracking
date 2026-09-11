@@ -6,10 +6,10 @@ pm2 stop helion-fleet-reporter 2>$null
 Write-Host "[deploy] Clearing port 3002..." -ForegroundColor Cyan
 $listening = netstat -ano | Select-String ':3002\s+.*LISTENING'
 foreach ($line in $listening) {
-    $pid = ($line.ToString().Trim() -split '\s+')[-1]
-    if ($pid -match '^\d+$' -and [int]$pid -gt 0) {
-        Write-Host "  Killing PID $pid"
-        taskkill /F /PID $pid 2>$null | Out-Null
+    $procId = ($line.ToString().Trim() -split '\s+')[-1]
+    if ($procId -match '^\d+$' -and [int]$procId -gt 0) {
+        Write-Host "  Killing PID $procId"
+        taskkill /F /PID $procId 2>$null | Out-Null
     }
 }
 Start-Sleep -Seconds 2
