@@ -57,6 +57,18 @@ async function addColIfMissing(col, def) {
 async function runStartupMigrations() {
   await addColIfMissing('can_view_dispatch', 'TINYINT(1) NOT NULL DEFAULT 0');
   await addColIfMissing('dispatch_vehicles', 'TEXT NULL');
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS dispatch_links (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      token VARCHAR(64) NOT NULL UNIQUE,
+      name VARCHAR(255) NOT NULL,
+      vehicles TEXT NOT NULL,
+      starts_at DATETIME NULL,
+      ends_at DATETIME NOT NULL,
+      created_by INT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `).catch(e => console.error('[migration] dispatch_links:', e.message));
 }
 const dailyLog = require('./src/tracking/lib/services/daily-log.service');
 const { purgeAllUncalibratedNotifications, purgeMalformedNotifications } = require('./src/tracking/fuel-insights.engine');

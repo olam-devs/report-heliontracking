@@ -87,6 +87,17 @@ export default function LiveMap({ user }) {
   const [pwMsg, setPwMsg] = useState(null);
   const [pwSaving, setPwSaving] = useState(false);
 
+  // Admin dispatch links
+  const [links, setLinks] = useState([]);
+  const [linkForm, setLinkForm] = useState(null); // null | 'new' | {id, ...} for editing
+  const [linkVehicles, setLinkVehicles] = useState(new Set());
+  const [linkName, setLinkName] = useState("");
+  const [linkStartsAt, setLinkStartsAt] = useState("");
+  const [linkEndsAt, setLinkEndsAt] = useState("");
+  const [linkSaving, setLinkSaving] = useState(false);
+  const [linkMsg, setLinkMsg] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
+
   const mapRef = useRef(null);
   const leafletRef = useRef(null);
   const markersRef = useRef({});
@@ -108,6 +119,7 @@ export default function LiveMap({ user }) {
   useEffect(() => {
     if (!isAdmin) return;
     apiFetch('/api/dispatch/users').then(j => setDispatchUsers(j.data || [])).catch(() => {});
+    apiFetch('/api/dispatch/links').then(j => setLinks(j.data || [])).catch(() => {});
   }, [isAdmin]);
 
   useEffect(() => {
@@ -293,6 +305,59 @@ export default function LiveMap({ user }) {
     finally { setPwSaving(false); }
   }
 
+  // ── Link management helpers ───────────────────────────────────────────────
+  function openNewLink() {
+    setLinkForm('new');
+    setLinkName(""); setLinkStartsAt(""); setLinkEndsAt("");
+    setLinkVehicles(new Set()); setLinkMsg(null);
+  }
+  function openEditLink(link) {
+    setLinkForm(link);
+    setLinkName(link.name);
+    setLinkStartsAt(link.starts_at ? link.starts_at.slice(0, 16) : "");
+    setLinkEndsAt(link.ends_at ? link.ends_at.slice(0, 16) : "");
+    setLinkVehicles(new Set((link.vehicles || []).map(String)));
+    setLinkMsg(null);
+  }
+  async function saveLink() {
+    if (!linkName || !linkEndsAt || linkVehicles.size === 0) {
+      setLinkMsg({ ok: false, text: "Name, at least one vehicle, and end date are required" });
+      return;
+    }
+    setLinkSaving(true); setLinkMsg(null);
+    try {
+      const body = { name: linkName, vehicles: [...linkVehicles], starts_at: linkStartsAt || null, ends_at: linkEndsAt };
+      let result;
+      if (linkForm === 'new') {
+        result = await apiFetch('/api/dispatch/links', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        setLinks(prev => [result.data, ...prev]);
+      } else {
+        result = await apiFetch(`/api/dispatch/links/${linkForm.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        setLinks(prev => prev.map(l => l.id === linkForm.id ? result.data : l));
+      }
+      setLinkForm(null); setLinkMsg(null);
+    } catch (e) { setLinkMsg({ ok: false, text: e.message }); }
+    finally { setLinkSaving(false); }
+  }
+  async function deleteLink(id) {
+    if (!window.confirm("Delete this tracking link? Anyone with the URL will lose access.")) return;
+    try {
+      await apiFetch(`/api/dispatch/links/${id}`, { method: 'DELETE' });
+      setLinks(prev => prev.filter(l => l.id !== id));
+      if (linkForm?.id === id) setLinkForm(null);
+    } catch {}
+  }
+  function copyLink(link) {
+    const url = `${window.location.origin}/dispatch/view/${link.token}`;
+    navigator.clipboard.writeText(url).then(() => { setCopiedId(link.id); setTimeout(() => setCopiedId(null), 2000); });
+  }
+  function linkStatus(link) {
+    const now = new Date();
+    if (link.starts_at && now < new Date(link.starts_at)) return 'scheduled';
+    if (now > new Date(link.ends_at)) return 'expired';
+    return 'active';
+  }
+
   // ── Vehicle list content (shared between sidebar and drawer) ─────────────
   const VehicleList = (
     <>
@@ -434,6 +499,111 @@ export default function LiveMap({ user }) {
     </div>
   );
 
+  // ── Links tab UI ─────────────────────────────────────────────────────────
+  const statusColors = { active: t.green, scheduled: t.orange, expired: t.muted };
+  const statusLabels = { active: "● Active", scheduled: "◷ Scheduled", expired: "○ Expired" };
+
+  const LinksTab = (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {!linkForm ? (
+        <>
+          <div style={{ padding: "10px 14px", borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: t.text }}>Tracking Links</span>
+            <button onClick={openNewLink} style={{ padding: "5px 12px", borderRadius: 8, border: "none", background: t.accent, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>+ New Link</button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            {links.length === 0 && <div style={{ padding: 16, color: t.muted, fontSize: 12 }}>No links yet. Create one to share live tracking with anyone.</div>}
+            {links.map(link => {
+              const status = linkStatus(link);
+              return (
+                <div key={link.id} style={{ padding: "11px 14px", borderBottom: `1px solid ${t.border}` }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{link.name}</div>
+                      <div style={{ fontSize: 10, color: statusColors[status], fontWeight: 700 }}>{statusLabels[status]}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                      <button onClick={() => copyLink(link)} title="Copy link"
+                        style={{ padding: "4px 8px", borderRadius: 6, border: `1px solid ${t.border}`, background: copiedId === link.id ? t.accentSoft : "none", color: copiedId === link.id ? t.accent : t.muted, fontSize: 11, cursor: "pointer", fontWeight: 700 }}>
+                        {copiedId === link.id ? "✓ Copied" : "Copy"}
+                      </button>
+                      <button onClick={() => openEditLink(link)} style={{ padding: "4px 8px", borderRadius: 6, border: `1px solid ${t.border}`, background: "none", color: t.muted, fontSize: 11, cursor: "pointer" }}>Edit</button>
+                      <button onClick={() => deleteLink(link.id)} style={{ padding: "4px 8px", borderRadius: 6, border: `1px solid ${t.border}`, background: "none", color: t.red, fontSize: 11, cursor: "pointer" }}>Del</button>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 10, color: t.muted }}>
+                    {link.vehicles.length} vehicle{link.vehicles.length !== 1 ? 's' : ''}
+                    {link.starts_at ? ` · From ${new Date(link.starts_at).toLocaleString()}` : ''}
+                    {` · Until ${new Date(link.ends_at).toLocaleString()}`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        /* Create / Edit form */
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div style={{ padding: "10px 14px", borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={() => setLinkForm(null)} style={{ background: "none", border: "none", color: t.muted, fontSize: 18, cursor: "pointer", lineHeight: 1 }}>←</button>
+            <span style={{ fontWeight: 700, fontSize: 13, color: t.text }}>{linkForm === 'new' ? 'New Tracking Link' : 'Edit Link'}</span>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px" }}>
+            <label style={{ display: "block", marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: t.muted, marginBottom: 4, textTransform: "uppercase" }}>Link Name</div>
+              <input value={linkName} onChange={e => setLinkName(e.target.value)} placeholder="e.g. Client ABC — Sept 2026"
+                style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${t.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 13, color: t.text, background: t.bg, outline: "none" }} />
+            </label>
+            <label style={{ display: "block", marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: t.muted, marginBottom: 4, textTransform: "uppercase" }}>Start (optional — leave blank for immediate)</div>
+              <input type="datetime-local" value={linkStartsAt} onChange={e => setLinkStartsAt(e.target.value)}
+                style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${t.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 12, color: t.text, background: t.bg, outline: "none" }} />
+            </label>
+            <label style={{ display: "block", marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: t.muted, marginBottom: 4, textTransform: "uppercase" }}>End (required)</div>
+              <input type="datetime-local" value={linkEndsAt} onChange={e => setLinkEndsAt(e.target.value)}
+                style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${t.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 12, color: t.text, background: t.bg, outline: "none" }} />
+            </label>
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: t.muted, marginBottom: 6, textTransform: "uppercase" }}>Vehicles ({linkVehicles.size} selected)</div>
+            {groupVehicles(allVehicles).map(([groupName, vehicles]) => (
+              <div key={groupName} style={{ marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${t.border}`, marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: t.muted, textTransform: "uppercase" }}>{groupName}</span>
+                  <button onClick={() => {
+                    const allIn = vehicles.every(v => linkVehicles.has(v.devIdno));
+                    setLinkVehicles(prev => { const n = new Set(prev); if (allIn) vehicles.forEach(v => n.delete(v.devIdno)); else vehicles.forEach(v => n.add(v.devIdno)); return n; });
+                  }} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, border: `1px solid ${t.border}`, background: "none", color: t.muted, cursor: "pointer" }}>
+                    {vehicles.every(v => linkVehicles.has(v.devIdno)) ? "Remove all" : "Add all"}
+                  </button>
+                </div>
+                {vehicles.map(v => {
+                  const checked = linkVehicles.has(v.devIdno);
+                  return (
+                    <div key={v.devIdno} onClick={() => setLinkVehicles(prev => { const n = new Set(prev); checked ? n.delete(v.devIdno) : n.add(v.devIdno); return n; })}
+                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0 5px 8px", cursor: "pointer" }}>
+                      <div style={{ width: 14, height: 14, borderRadius: 3, border: `2px solid ${checked ? t.accent : t.border}`, background: checked ? t.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        {checked && <span style={{ color: "#fff", fontSize: 9 }}>✓</span>}
+                      </div>
+                      <span style={{ fontSize: 12, color: t.text, fontWeight: checked ? 700 : 400 }}>{v.plate}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+          <div style={{ padding: "10px 14px", borderTop: `1px solid ${t.border}` }}>
+            {linkMsg && <div style={{ fontSize: 11, color: linkMsg.ok ? t.green : t.red, marginBottom: 8 }}>{linkMsg.text}</div>}
+            <button onClick={saveLink} disabled={linkSaving}
+              style={{ width: "100%", padding: "9px 0", borderRadius: 8, border: "none", background: linkSaving ? t.border : t.accent, color: "#fff", fontWeight: 700, fontSize: 13, cursor: linkSaving ? "not-allowed" : "pointer" }}>
+              {linkSaving ? "Saving…" : linkForm === 'new' ? "Create Link" : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   // ── Drawer heights ────────────────────────────────────────────────────────
   const drawerHeight = drawerSnap === 'full' ? '90vh' : drawerSnap === 'half' ? '50vh' : 72;
 
@@ -528,9 +698,9 @@ export default function LiveMap({ user }) {
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 8 }}>
               <div style={{ display: "flex", gap: 0 }}>
-                {(isAdmin ? ["map", "users"] : ["map"]).map(tab => (
-                  <button key={tab} onClick={() => setSideTab(tab)} style={{ padding: "5px 14px", border: "none", background: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, color: sideTab === tab ? t.accent : t.muted, borderBottom: `2px solid ${sideTab === tab ? t.accent : "transparent"}` }}>
-                    {tab === "map" ? `Vehicles${allVehicles.length > 0 ? ` (${selected.size}/${allVehicles.length})` : ""}` : "Manage Users"}
+                {(isAdmin ? ["map", "links", "users"] : ["map"]).map(tab => (
+                  <button key={tab} onClick={() => setSideTab(tab)} style={{ padding: "5px 10px", border: "none", background: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, color: sideTab === tab ? t.accent : t.muted, borderBottom: `2px solid ${sideTab === tab ? t.accent : "transparent"}` }}>
+                    {tab === "map" ? `Vehicles${allVehicles.length > 0 ? ` (${selected.size}/${allVehicles.length})` : ""}` : tab === "links" ? "Links" : "Users"}
                   </button>
                 ))}
               </div>
@@ -543,8 +713,8 @@ export default function LiveMap({ user }) {
           </div>
 
           {/* Drawer content */}
-          <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
-            {sideTab === "map" ? VehicleList : ManageUsers}
+          <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column" }}>
+            {sideTab === "map" ? VehicleList : sideTab === "links" ? LinksTab : ManageUsers}
           </div>
         </div>
 
@@ -562,16 +732,16 @@ export default function LiveMap({ user }) {
           <div style={{ fontWeight: 800, fontSize: 14, color: t.text, marginBottom: 10 }}>Dispatch View</div>
           {isAdmin && (
             <div style={{ display: "flex", gap: 0 }}>
-              {["map", "users"].map(tab => (
-                <button key={tab} onClick={() => setSideTab(tab)} style={{ flex: 1, padding: "6px 0", border: "none", background: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, color: sideTab === tab ? t.accent : t.muted, borderBottom: `2px solid ${sideTab === tab ? t.accent : "transparent"}`, textTransform: "capitalize" }}>
-                  {tab === "map" ? "Map" : "Manage Users"}
+              {["map", "links", "users"].map(tab => (
+                <button key={tab} onClick={() => setSideTab(tab)} style={{ flex: 1, padding: "6px 0", border: "none", background: "none", cursor: "pointer", fontWeight: 700, fontSize: 11, color: sideTab === tab ? t.accent : t.muted, borderBottom: `2px solid ${sideTab === tab ? t.accent : "transparent"}` }}>
+                  {tab === "map" ? "Map" : tab === "links" ? "Links" : "Users"}
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        {sideTab === "map" ? (
+        {sideTab === "links" ? LinksTab : sideTab === "users" ? ManageUsers : (
           <>
             <div style={{ padding: "10px 14px 0", borderBottom: `1px solid ${t.border}` }}>
               <div style={{ position: "relative" }} ref={searchRef}>
@@ -606,7 +776,7 @@ export default function LiveMap({ user }) {
             </div>
             <div style={{ flex: 1, overflowY: "auto" }}>{VehicleList}</div>
           </>
-        ) : ManageUsers}
+        )}
       </div>
 
       {/* Map */}

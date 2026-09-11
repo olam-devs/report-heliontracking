@@ -12,6 +12,7 @@ import ReportTemplates from './pages/ReportTemplates';
 import Layout from './components/Layout';
 import MechanicPortal from './pages/MechanicPortal';
 import DispatchPage from './pages/DispatchPage';
+import PublicTrackingView from './pages/PublicTrackingView';
 import api from './api/client';
 import toast from 'react-hot-toast';
 import TrackingPortal, {
@@ -75,6 +76,7 @@ function AppRoutes() {
           <Route path="danger-zones" element={<TrackingDangerZones />} />
         </Route>
       </Route>
+      <Route path="/dispatch/view/:token" element={<PublicTrackingView />} />
       <Route path="*" element={<DefaultRedirect />} />
     </Routes>
   );
