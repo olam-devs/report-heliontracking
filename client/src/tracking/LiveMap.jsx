@@ -242,6 +242,20 @@ export default function LiveMap({ user }) {
     }
   }, [selected]);
 
+  // Show markers for link-form selected vehicles (using allVehicles data)
+  useEffect(() => {
+    if (!leafletRef.current) return;
+    if (linkForm && !running) {
+      const byId = {};
+      for (const v of allVehicles) byId[v.devIdno] = v;
+      const merged = { ...byId, ...statuses };
+      updateMarkers(merged, linkVehicles);
+    } else if (!linkForm && !running) {
+      for (const m of Object.values(markersRef.current)) m.remove();
+      markersRef.current = {};
+    }
+  }, [linkForm, linkVehicles, allVehicles, statuses, running, updateMarkers]);
+
   function toggleSelect(id) {
     setSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   }
@@ -411,7 +425,8 @@ export default function LiveMap({ user }) {
                         <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, flexShrink: 0, display: "inline-block" }} />
                         {unconfirmedSt ? <span style={{ color: "#c17900", fontWeight: 700 }}>⚠ GPS not locked</span>
                           : !gpsOkSt ? <span style={{ color: t.muted }}>GPS invalid</span>
-                          : online ? <span style={{ color: t.green }}>Online{st.speed != null ? ` · ${st.speed.toFixed(0)} km/h` : ""}</span>
+                          : online && st.speed != null && st.speed > 1 ? <span style={{ color: t.green }}>Driving · {st.speed.toFixed(0)} km/h</span>
+                          : online ? <span style={{ color: "#f59e0b" }}>Parked{ago ? ` · ${ago}` : ""}</span>
                           : <span style={{ color: t.orange }}>Offline{ago ? ` · ${ago}` : ""}</span>}
                       </div>
                     )}
@@ -611,12 +626,11 @@ export default function LiveMap({ user }) {
                           </div>
                           <div style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
                           <span style={{ fontSize: 12, color: t.text, fontWeight: checked ? 700 : 400, flex: 1 }}>{v.plate}</span>
-                          <span style={{ fontSize: 10, color: t.muted }}>{isOnline && st?.speed != null ? `${Math.round(st.speed)} km/h` : isOnline ? "online" : lastSeen ? lastSeen : "offline"}</span>
+                          <span style={{ fontSize: 10, color: isOnline && st?.speed > 1 ? t.green : isOnline ? "#f59e0b" : t.muted }}>{isOnline && st?.speed != null && st.speed > 1 ? `Driving · ${Math.round(st.speed)} km/h` : isOnline ? "Parked" : lastSeen ? `Offline · ${lastSeen}` : "Offline"}</span>
                         </div>
                         {isFocused && (
                           <div style={{ marginLeft: 30, marginBottom: 4, padding: "5px 8px", background: t.panelBright, borderRadius: 6, fontSize: 10, color: t.muted, display: "flex", flexWrap: "wrap", gap: "4px 10px" }}>
-                            <span style={{ color: dotColor, fontWeight: 700 }}>{!isOnline ? "Offline" : !hasGps ? "No GPS" : "Online · GPS OK"}</span>
-                            {isOnline && st?.speed != null && <span>{Math.round(st.speed)} km/h</span>}
+                            <span style={{ color: dotColor, fontWeight: 700 }}>{!isOnline ? "Offline" : !hasGps ? "No GPS" : st?.speed != null && st.speed > 1 ? `Driving · ${Math.round(st.speed)} km/h` : "Parked"}</span>
                             {!isOnline && lastSeen && <span>Last seen {lastSeen}</span>}
                             {st?.gpsTime && <span>{new Date(st.gpsTime).toLocaleString()}</span>}
                           </div>
