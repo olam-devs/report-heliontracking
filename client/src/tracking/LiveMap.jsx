@@ -387,13 +387,13 @@ export default function LiveMap({ user }) {
               </div>
             </div>
             {expanded && vehicles.map(v => {
-              const st = statuses[v.devIdno];
+              const st = statuses[v.devIdno] || v; // fall back to allVehicles data before polling starts
               const isSelected = selected.has(v.devIdno);
               const online = st?.online;
               const ago = agoLabel(st?.gpsTime);
               const gpsOkSt = st?.gpsValid && st?.gpsLocked !== false;
               const unconfirmedSt = st?.online && !gpsOkSt;
-              const dotColor = !st ? t.border : unconfirmedSt ? "#f5a623" : !gpsOkSt ? t.muted : online ? t.green : t.orange;
+              const dotColor = unconfirmedSt ? "#f5a623" : !gpsOkSt ? t.muted : online ? t.green : t.orange;
               return (
                 <div key={v.devIdno}
                   onClick={() => toggleSelect(v.devIdno)}
@@ -590,11 +590,12 @@ export default function LiveMap({ user }) {
                   )}
                   {vehicles.map(v => {
                     const checked = linkVehicles.has(v.devIdno);
-                    const st = statuses[v.devIdno];
+                    const st = statuses[v.devIdno] || v; // fall back to initial allVehicles data
                     const isOnline = st?.online;
                     const hasGps = st?.gpsValid && st?.gpsLocked !== false;
-                    const dotColor = !st ? t.border : !isOnline ? t.muted : !hasGps ? t.orange : t.green;
+                    const dotColor = !isOnline ? t.muted : !hasGps ? "#f5a623" : t.green;
                     const isFocused = linkFocused === v.devIdno;
+                    const lastSeen = !isOnline ? agoLabel(st?.gpsTime) : null;
                     return (
                       <div key={v.devIdno}>
                         <div onClick={() => {
@@ -610,13 +611,14 @@ export default function LiveMap({ user }) {
                           </div>
                           <div style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
                           <span style={{ fontSize: 12, color: t.text, fontWeight: checked ? 700 : 400, flex: 1 }}>{v.plate}</span>
-                          {st && <span style={{ fontSize: 10, color: t.muted }}>{st.speed != null ? `${Math.round(st.speed)} km/h` : isOnline ? "online" : "offline"}</span>}
+                          <span style={{ fontSize: 10, color: t.muted }}>{isOnline && st?.speed != null ? `${Math.round(st.speed)} km/h` : isOnline ? "online" : lastSeen ? lastSeen : "offline"}</span>
                         </div>
-                        {isFocused && st && (
-                          <div style={{ marginLeft: 30, marginBottom: 4, padding: "4px 8px", background: t.panelBright, borderRadius: 6, fontSize: 10, color: t.muted, display: "flex", gap: 10 }}>
+                        {isFocused && (
+                          <div style={{ marginLeft: 30, marginBottom: 4, padding: "5px 8px", background: t.panelBright, borderRadius: 6, fontSize: 10, color: t.muted, display: "flex", flexWrap: "wrap", gap: "4px 10px" }}>
                             <span style={{ color: dotColor, fontWeight: 700 }}>{!isOnline ? "Offline" : !hasGps ? "No GPS" : "Online · GPS OK"}</span>
-                            {st.speed != null && <span>{Math.round(st.speed)} km/h</span>}
-                            {st.gpsTime && <span>{new Date(st.gpsTime * 1000).toLocaleTimeString()}</span>}
+                            {isOnline && st?.speed != null && <span>{Math.round(st.speed)} km/h</span>}
+                            {!isOnline && lastSeen && <span>Last seen {lastSeen}</span>}
+                            {st?.gpsTime && <span>{new Date(st.gpsTime).toLocaleString()}</span>}
                           </div>
                         )}
                       </div>
