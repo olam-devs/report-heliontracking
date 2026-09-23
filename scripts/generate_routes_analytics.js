@@ -60,7 +60,7 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 const isNear = (lat, lng, wp) =>
   lat != null && lng != null && haversineKm(lat, lng, wp.lat, wp.lng) <= wp.radiusKm;
 
-const fmt2 = (n) => (n != null && isFinite(n) ? +n.toFixed(2) : null);
+const fmt2 = (n) => { const v = Number(n); return (n != null && isFinite(v) ? +v.toFixed(2) : null); };
 
 const safeName = (s) => String(s).replace(/[\\/?*[\]:]/g, '').slice(0, 28);
 
