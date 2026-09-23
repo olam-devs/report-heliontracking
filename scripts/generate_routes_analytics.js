@@ -197,26 +197,55 @@ function addSheet(wb, data, sheetName) {
     return tables;
   }
 
+  // Vehicle→shard cache so we don't try all 4 shards every time
+  const vehicleShardCache = {}; // vehiID_yyyymm → shard table name or null
+
   // Fetch and parse GPS points for a vehicle on a given date
   async function getTrackPoints(vehiID, ds) {
     if (!trackTableBase) return [];
     const yyyymm = ds.replace(/-/g, '').slice(0, 6);
-    const tables = trackTablesForMonth(yyyymm);
-    if (!tables.length) return [];
+    const cacheKey = `${vehiID}_${yyyymm}`;
 
+    // Use cached shard if known
+    if (vehicleShardCache[cacheKey] !== undefined) {
+      const cachedTable = vehicleShardCache[cacheKey];
+      if (!cachedTable) return [];
+      const [r] = await conn.query(
+        `SELECT GPSData FROM ${cachedTable} WHERE VehiID = ? AND GPSDate = ? LIMIT 1`,
+        [vehiID, ds]
+      ).catch(() => [[]]);
+      return (r.length && r[0].GPSData) ? parseGPSBlob(r[0].GPSData) : [];
+    }
+
+    // Try all shards for this month
+    const tables = trackTablesForMonth(yyyymm);
     for (const t of tables) {
-      const [rows] = await conn.query(
+      const [r] = await conn.query(
         `SELECT GPSData FROM ${t} WHERE VehiID = ? AND GPSDate = ? LIMIT 1`,
         [vehiID, ds]
       ).catch(() => [[]]);
-      if (rows.length && rows[0].GPSData) {
-        return parseGPSBlob(rows[0].GPSData);
+      if (r.length && r[0].GPSData) {
+        vehicleShardCache[cacheKey] = t; // remember this shard
+        return parseGPSBlob(r[0].GPSData);
       }
     }
+    vehicleShardCache[cacheKey] = null;
     return [];
   }
 
-  // ── 5. Classify trips into routes ────────────────────────────────────────────
+  // ── 5. Normalise fuel/distance on all rows ────────────────────────────────────
+  for (const r of rows) {
+    r.usedFuelL  = fmt2(r.usedFuelL);
+    r.startFuelL = fmt2(r.startFuelL);
+    r.endFuelL   = fmt2(r.endFuelL);
+    r.distKm     = r.distKm ? fmt2(r.distKm) : null;
+    r.kmPerL     = r.distKm && r.usedFuelL > 0 ? fmt2(r.distKm / r.usedFuelL) : null;
+    r.lPer100km  = r.distKm && r.usedFuelL > 0 ? fmt2(r.usedFuelL / r.distKm * 100) : null;
+  }
+
+  // ── 6. Classify every trip via GPS blob ───────────────────────────────────────
+  // Daily SWeiDu/SJingDu are factory-default China coords — useless.
+  // All classification must come from the GPS track blobs.
   const bucket = {
     mbogaPortDirect: [],
     mbogaPortUbungo: [],
@@ -224,80 +253,57 @@ function addSheet(wb, data, sheetName) {
     vikindPort:      [],
   };
 
-  const hasCoords = !!(startLatCol && rows.some((r) => r.sLat != null && r.sLat !== 0));
-  console.log(`Has daily start/end coords: ${hasCoords}`);
+  if (trackTableBase) {
+    console.log(`\nScanning GPS blobs for ${rows.length} records (this takes 2-5 min)...`);
+    let processed = 0, withBlob = 0;
 
-  for (const r of rows) {
-    r.usedFuelL = fmt2(r.usedFuelL);
-    r.startFuelL = fmt2(r.startFuelL);
-    r.endFuelL   = fmt2(r.endFuelL);
-    r.distKm     = r.distKm ? fmt2(r.distKm) : null;
-    r.kmPerL     = r.distKm && r.usedFuelL > 0 ? fmt2(r.distKm / r.usedFuelL) : null;
-    r.lPer100km  = r.distKm && r.usedFuelL > 0 ? fmt2(r.usedFuelL / r.distKm * 100) : null;
+    for (const r of rows) {
+      processed++;
+      if (processed % 100 === 0) {
+        process.stdout.write(`\r  ${processed}/${rows.length} processed, ${withBlob} blobs read, classified: M→P=${bucket.mbogaPortDirect.length+bucket.mbogaPortUbungo.length} P→V=${bucket.portVikindu.length} V→P=${bucket.vikindPort.length}   `);
+      }
 
-    if (hasCoords) {
-      const fromMboga   = isNear(r.sLat, r.sLng, WP.MBOGA);
-      const toPort      = isNear(r.eLat, r.eLng, WP.PORT);
-      const fromPort    = isNear(r.sLat, r.sLng, WP.PORT);
-      const toVikindu   = isNear(r.eLat, r.eLng, WP.VIKINDU);
-      const fromVikindu = isNear(r.sLat, r.sLng, WP.VIKINDU);
-
-      if (fromMboga && toPort) { r._needUbungoCheck = true; bucket.mbogaPortDirect.push(r); }
-      else if (fromPort && toVikindu) bucket.portVikindu.push(r);
-      else if (fromVikindu && isNear(r.eLat, r.eLng, WP.PORT)) bucket.vikindPort.push(r);
-    }
-  }
-
-  // ── 6. Detect routes + Ubungo stops via GPS track ────────────────────────────
-  if (trackTableBase && (bucket.mbogaPortDirect.length || !hasCoords)) {
-    console.log('\nClassifying trips via GPS track tables (may take a minute)...');
-
-    const toCheck = hasCoords ? bucket.mbogaPortDirect : rows.slice(0, 1000);
-    let checked = 0;
-    for (const r of toCheck) {
       const ds = dateStr(r.date);
       const pts = await getTrackPoints(r.vehiID, ds);
-
       if (!pts.length) continue;
-      checked++;
+      withBlob++;
 
-      if (!hasCoords) {
-        const first = pts[0], last = pts[pts.length - 1];
-        const hitM = pts.some((p) => isNear(p.lat, p.lng, WP.MBOGA));
-        const hitP = pts.some((p) => isNear(p.lat, p.lng, WP.PORT));
-        const hitV = pts.some((p) => isNear(p.lat, p.lng, WP.VIKINDU));
-        const hitU = pts.some((p) => isNear(p.lat, p.lng, WP.UBUNGO));
+      const first = pts[0], last = pts[pts.length - 1];
+      const hitM = pts.some((p) => isNear(p.lat, p.lng, WP.MBOGA));
+      const hitP = pts.some((p) => isNear(p.lat, p.lng, WP.PORT));
+      const hitV = pts.some((p) => isNear(p.lat, p.lng, WP.VIKINDU));
+      const hitU = pts.some((p) => isNear(p.lat, p.lng, WP.UBUNGO));
 
-        const fromM = isNear(first.lat, first.lng, WP.MBOGA) || (hitM && !hitP && !hitV);
-        const fromP = isNear(first.lat, first.lng, WP.PORT);
-        const fromV = isNear(first.lat, first.lng, WP.VIKINDU);
-        const toP   = isNear(last.lat,  last.lng,  WP.PORT)    || hitP;
-        const toV   = isNear(last.lat,  last.lng,  WP.VIKINDU) || hitV;
+      // Route: start near Mboga AND visited Port (end there or passed through)
+      const fromM = isNear(first.lat, first.lng, WP.MBOGA) || hitM;
+      const fromP = isNear(first.lat, first.lng, WP.PORT);
+      const fromV = isNear(first.lat, first.lng, WP.VIKINDU) || hitV;
+      const toP   = isNear(last.lat,  last.lng,  WP.PORT)    || hitP;
+      const toV   = isNear(last.lat,  last.lng,  WP.VIKINDU) || hitV;
 
-        if (fromM && toP) {
+      if (hitM && hitP && !hitV) {
+        // Mboga ↔ Port trip
+        // "from Mboga" = first point closer to Mboga than Port
+        const firstDistM = haversineKm(first.lat, first.lng, WP.MBOGA.lat, WP.MBOGA.lng);
+        const firstDistP = haversineKm(first.lat, first.lng, WP.PORT.lat,  WP.PORT.lng);
+        if (firstDistM <= firstDistP) {
+          // Mboga → Port direction
           r._viaUbungo = hitU;
           if (hitU) bucket.mbogaPortUbungo.push(r);
           else       bucket.mbogaPortDirect.push(r);
-        } else if (fromP && toV) {
-          bucket.portVikindu.push(r);
-        } else if (fromV && toP) {
-          bucket.vikindPort.push(r);
         }
-      } else {
-        // Already in mbogaPortDirect — check if Ubungo was visited
-        if (pts.some((p) => isNear(p.lat, p.lng, WP.UBUNGO))) {
-          r._viaUbungo = true;
-        }
+        // Port → Mboga direction is not one of our target routes, skip
+      } else if (hitP && hitV) {
+        // Port ↔ Vikindu trip
+        const firstDistP = haversineKm(first.lat, first.lng, WP.PORT.lat,    WP.PORT.lng);
+        const firstDistV = haversineKm(first.lat, first.lng, WP.VIKINDU.lat, WP.VIKINDU.lng);
+        if (firstDistP <= firstDistV) bucket.portVikindu.push(r);
+        else                           bucket.vikindPort.push(r);
       }
     }
 
-    if (hasCoords) {
-      // Split mbogaPortDirect → direct vs via Ubungo
-      bucket.mbogaPortUbungo = bucket.mbogaPortDirect.filter((r) => r._viaUbungo);
-      bucket.mbogaPortDirect  = bucket.mbogaPortDirect.filter((r) => !r._viaUbungo);
-    }
-
-    console.log(`Checked ${checked} tracks`);
+    process.stdout.write('\n');
+    console.log(`  Blobs read: ${withBlob} / ${rows.length}`);
   }
 
   await conn.end();
