@@ -40,12 +40,11 @@ function parseGPSBlob(buf) {
     `SELECT ID, VehiIDNO FROM jt808_vehicle_info WHERE VehiIDNO LIKE '%T887ERP%' LIMIT 3`);
   console.log('T887ERP vehicles:', vRows);
 
-  // 2. Also find any Distribution vehicle with recent GPS data
+  // 2. Also find SEMI vehicles (CompanyID=3) with recent GPS data
   const [distV] = await conn.query(`
     SELECT vi.ID, vi.VehiIDNO FROM jt808_vehicle_info vi
-    JOIN jt808_company_info co ON co.ID = vi.CompanyID
-    WHERE co.ID = 9 AND vi.VehiIDNO LIKE '%Canter%'
-    LIMIT 5`);
+    WHERE vi.CompanyID = 3
+    LIMIT 8`);
   console.log('\nSample Distribution vehicles:', distV.map(v => `${v.ID}:${v.VehiIDNO}`).join(', '));
 
   // 3. For each, try to find a GPS blob and print parsed coords

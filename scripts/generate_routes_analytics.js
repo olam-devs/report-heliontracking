@@ -151,7 +151,7 @@ function addSheet(wb, data, sheetName) {
     FROM jt808_vehicle_daily vd
     JOIN jt808_vehicle_info  vi ON vi.ID = vd.VehiID
     JOIN jt808_company_info  co ON co.ID = vi.CompanyID
-    WHERE co.ID = 9
+    WHERE co.ID = 3                          -- SEMI group
       AND vd.GPSDate >= DATE_SUB(CURDATE(), INTERVAL 180 DAY)
       AND vd.SYouLiang > 0
       AND vd.EYouLiang > 0
