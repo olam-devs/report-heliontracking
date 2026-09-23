@@ -39,6 +39,10 @@ function classifyFuel(status, fuelTrack, wasStaleOnline) {
   if (!status) return null;
   const fuel = status.fuel;
   if (fuel == null) return null; // no sensor configured in CMSV
+  // fuel === 0 means CMSV is receiving a zero reading — sensor dead or not configured
+  if (fuel === 0) return 'zero';
+  // Spike guard: values above a realistic tank max (e.g. 1000 L) are sensor garbage
+  if (fuel > 1000) return 'spike';
   const online = (status.ol ?? status.online ?? 0) !== 0;
   if (online) {
     const mileage = status.mileageKm ?? null;
@@ -68,7 +72,21 @@ function StatusRow({ status, fuelKind }) {
   const lastSeenDate = !online && gpsTime ? fmtTs(gpsTime) : null;
 
   let fuelPill = null;
-  if (fuelKind === 'ok') {
+  if (fuelKind === 'zero') {
+    fuelPill = (
+      <span className="px-2 py-1 rounded-full bg-red-100 text-red-700 font-semibold"
+        title="CMSV is receiving 0 L — sensor not sending data. Needs device configuration or wiring check.">
+        ⛽ ✗ Sensor dead — 0 L reading
+      </span>
+    );
+  } else if (fuelKind === 'spike') {
+    fuelPill = (
+      <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-700 font-semibold"
+        title="Fuel reading is abnormally high — sensor spike or miscalibration.">
+        ⛽ ⚠ Sensor spike — check calibration
+      </span>
+    );
+  } else if (fuelKind === 'ok') {
     fuelPill = (
       <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 font-semibold">⛽ Sensor OK</span>
     );

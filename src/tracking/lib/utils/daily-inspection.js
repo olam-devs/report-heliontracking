@@ -82,6 +82,18 @@ function assessFuelSensor(fuelSeries, fuelEvents, dropThresholdL) {
   if (!fuelSeries?.length) {
     return { ok: false, reason: 'No fuel readings in period' };
   }
+
+  // Sensor stuck at 0 or a single constant value — not reporting real data
+  const nonZero = fuelSeries.filter((v) => v > 0);
+  if (nonZero.length === 0) {
+    return { ok: false, reason: 'Fuel sensor stuck at 0 L — not calibrated or disconnected' };
+  }
+  const uniqueVals = new Set(fuelSeries.map((v) => Math.round(v)));
+  if (uniqueVals.size === 1) {
+    const val = [...uniqueVals][0];
+    return { ok: false, reason: `Fuel sensor frozen at ${val} L — no variation detected` };
+  }
+
   const drops = (fuelEvents || []).filter((e) => e.type === 'drop');
   if (!drops.length) {
     return { ok: true, reason: 'Fuel sensor reporting normally' };
