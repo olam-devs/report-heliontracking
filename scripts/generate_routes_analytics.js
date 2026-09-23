@@ -160,49 +160,34 @@ function addSheet(wb, data, sheetName) {
 
   console.log(`Fetched ${rows.length} daily fuel records`);
 
-  // ── 4. Probe GPS track tables ────────────────────────────────────────────────
-  // Tables are partitioned: jt808_vehicle_gps_N_YYYYMM (N=1..4, shard by device)
-  // We need to query all N shards for a given YYYYMM
-  let tLatCol = null, tLngCol = null, tTimeCol = null, tVidCol = null;
-  let coordScale = 1000000;
-  let trackTableBase = null; // e.g. "jt808_vehicle_gps"
-  let allTrackTableNames = new Set(); // full names present in DB
+  // ── 4. Set up GPS track table lookup ─────────────────────────────────────────
+  // Tables: jt808_vehicle_gps_N_YYYYMM (N=1..4, monthly partitions)
+  // Each row: VehiID, DevIDNO, GPSDate, GPSData (mediumblob)
+  // GPSData binary format:
+  //   - Bytes 0-35: header (skip)
+  //   - Bytes 36, 72, 108 ... : GPS records, each 36 bytes
+  //   Within each 36-byte GPS record:
+  //     - offset 3: longitude  (signed LE int32, ÷1e6 = degrees East)
+  //     - offset 7: latitude   (signed LE int32, ÷1e6 = degrees, negative = South)
 
-  if (trackTbls.length) {
-    // Probe columns from the first table
-    const firstTable = trackTbls[0].TABLE_NAME;
-    const [tCols] = await conn.query(`
-      SELECT COLUMN_NAME FROM information_schema.COLUMNS
-      WHERE TABLE_SCHEMA='1010GPS' AND TABLE_NAME=?
-      ORDER BY ORDINAL_POSITION LIMIT 30`, [firstTable]);
-    const tc = tCols.map((r) => r.COLUMN_NAME);
-    console.log(`Track table '${firstTable}' cols: ${tc.join(', ')}`);
+  const allTrackTableNames = new Set(trackTbls.map((t) => t.TABLE_NAME));
+  const trackBaseMatch = trackTbls[0]?.TABLE_NAME.match(/^(.+?)_\d+_\d{6}$/);
+  const trackTableBase = trackBaseMatch ? trackBaseMatch[1] : null;
+  console.log(`Track base: ${trackTableBase}  known shards: ${allTrackTableNames.size}`);
 
-    // CMSV6 Chinese GPS cols: WeiDu=latitude, JingDu=longitude, GPSTime=timestamp
-    tLatCol  = tc.find((c) => /^WeiDu$/i.test(c))  || tc.find((c) => /^lat/i.test(c));
-    tLngCol  = tc.find((c) => /^JingDu$/i.test(c)) || tc.find((c) => /^lo?ng/i.test(c));
-    tTimeCol = tc.find((c) => /^GPSTime$/i.test(c)) || tc.find((c) => /time|gpstime/i.test(c));
-    tVidCol  = tc.find((c) => /^VehiID$/i.test(c)) || tc.find((c) => /vehi.*id|vid/i.test(c)) || 'VehiID';
-
-    // Detect coordinate scale from sample
-    const [samp] = await conn.query(
-      `SELECT ${tLatCol} AS lat FROM ${firstTable} WHERE ${tLatCol} != 0 LIMIT 1`);
-    if (samp.length) {
-      const lat = Number(samp[0].lat);
-      coordScale = Math.abs(lat) > 90 ? 1000000 : 1;
-      console.log(`Track scale: ÷${coordScale}  sample lat=${lat}`);
+  function parseGPSBlob(buf) {
+    if (!Buffer.isBuffer(buf) || buf.length < 72) return [];
+    const RECORD = 36;
+    const pts = [];
+    for (let off = RECORD; off + RECORD <= buf.length; off += RECORD) {
+      const lng = buf.readInt32LE(off + 3) / 1e6;
+      const lat = buf.readInt32LE(off + 7) / 1e6;
+      // Skip null/zero points
+      if (Math.abs(lat) > 0.1 && Math.abs(lng) > 0.1) pts.push({ lat, lng });
     }
-
-    // Collect all table names matching the partition pattern
-    trackTbls.forEach((t) => allTrackTableNames.add(t.TABLE_NAME));
-
-    // Extract base name pattern (e.g. "jt808_vehicle_gps")
-    const m = firstTable.match(/^(.+?)_\d+_\d{6}$/);
-    trackTableBase = m ? m[1] : null;
-    console.log(`Track base: ${trackTableBase}, shards known: ${allTrackTableNames.size}`);
+    return pts;
   }
 
-  // Helper: get all shard table names for a given YYYYMM
   function trackTablesForMonth(yyyymm) {
     const tables = [];
     for (let n = 1; n <= 4; n++) {
@@ -212,20 +197,23 @@ function addSheet(wb, data, sheetName) {
     return tables;
   }
 
-  // Query GPS points for a vehicle on a date across all shards
+  // Fetch and parse GPS points for a vehicle on a given date
   async function getTrackPoints(vehiID, ds) {
-    if (!trackTableBase || !tLatCol) return [];
+    if (!trackTableBase) return [];
     const yyyymm = ds.replace(/-/g, '').slice(0, 6);
     const tables = trackTablesForMonth(yyyymm);
     if (!tables.length) return [];
 
-    const unionParts = tables.map(
-      (t) => `SELECT ${tLatCol}/${coordScale} AS lat, ${tLngCol}/${coordScale} AS lng, ${tTimeCol} AS t
-               FROM ${t} WHERE ${tVidCol}=${conn.escape(vehiID)} AND DATE(${tTimeCol})=${conn.escape(ds)}`
-    );
-    const sql = unionParts.join(' UNION ALL ') + ` ORDER BY t`;
-    const [pts] = await conn.query(sql).catch(() => [[]]);
-    return pts;
+    for (const t of tables) {
+      const [rows] = await conn.query(
+        `SELECT GPSData FROM ${t} WHERE VehiID = ? AND GPSDate = ? LIMIT 1`,
+        [vehiID, ds]
+      ).catch(() => [[]]);
+      if (rows.length && rows[0].GPSData) {
+        return parseGPSBlob(rows[0].GPSData);
+      }
+    }
+    return [];
   }
 
   // ── 5. Classify trips into routes ────────────────────────────────────────────
