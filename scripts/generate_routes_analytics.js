@@ -177,13 +177,15 @@ function addSheet(wb, data, sheetName) {
 
   function parseGPSBlob(buf) {
     if (!Buffer.isBuffer(buf) || buf.length < 72) return [];
-    const RECORD = 36;
+    // Each 72-byte record: [36-byte metadata][36-byte GPS data]
+    // GPS half: lng at offset 2 (bytes 38-41), lat at offset 6 (bytes 42-45) from record start
+    const RECORD = 72;
     const pts = [];
-    for (let off = RECORD; off + RECORD <= buf.length; off += RECORD) {
-      const lng = buf.readInt32LE(off + 3) / 1e6;
-      const lat = buf.readInt32LE(off + 7) / 1e6;
-      // Skip null/zero points
-      if (Math.abs(lat) > 0.1 && Math.abs(lng) > 0.1) pts.push({ lat, lng });
+    for (let off = 0; off + RECORD <= buf.length; off += RECORD) {
+      const lng = buf.readInt32LE(off + 38) / 1e6;
+      const lat = buf.readInt32LE(off + 42) / 1e6;
+      if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180 &&
+          (Math.abs(lat) > 0.01 || Math.abs(lng) > 0.01)) pts.push({ lat, lng });
     }
     return pts;
   }
