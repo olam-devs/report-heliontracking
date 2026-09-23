@@ -249,7 +249,7 @@ function addSheet(wb, data, sheetName) {
   }
 
   // ── 6. Detect routes + Ubungo stops via GPS track ────────────────────────────
-  if (trackTableBase && tLatCol && (bucket.mbogaPortDirect.length || !hasCoords)) {
+  if (trackTableBase && (bucket.mbogaPortDirect.length || !hasCoords)) {
     console.log('\nClassifying trips via GPS track tables (may take a minute)...');
 
     const toCheck = hasCoords ? bucket.mbogaPortDirect : rows.slice(0, 1000);
