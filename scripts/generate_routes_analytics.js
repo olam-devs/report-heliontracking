@@ -96,16 +96,19 @@ function addSheet(wb, data, sheetName) {
   const cols = colRows.map((r) => r.COLUMN_NAME);
   console.log(`Daily cols: ${cols.join(', ')}`);
 
-  // Look for start/end lat/lng columns (CMSV6 naming varies)
-  const startLatCol = cols.find((c) => /^s.*lat/i.test(c));
-  const startLngCol = cols.find((c) => /^s.*lo?n/i.test(c));
-  const endLatCol   = cols.find((c) => /^e.*lat/i.test(c));
-  const endLngCol   = cols.find((c) => /^e.*lo?n/i.test(c));
-  // Mileage column
-  const milesCol    = cols.find((c) => /^(mile|dist|km|mileage)/i.test(c) && !/total/i.test(c))
-                   || cols.find((c) => /mile|dist(?!ance)|mileage/i.test(c));
+  // CMSV6 Chinese column names:
+  //   SWeiDu = start latitude (纬度), SJingDu = start longitude (经度)
+  //   EWeiDu = end latitude,           EJingDu = end longitude
+  //   SLiCheng = start odometer,       ELiCheng = end odometer (×0.1 km)
+  const startLatCol = cols.find((c) => /^SWeiDu$/i.test(c))  || cols.find((c) => /^s.*lat/i.test(c));
+  const startLngCol = cols.find((c) => /^SJingDu$/i.test(c)) || cols.find((c) => /^s.*lo?n/i.test(c));
+  const endLatCol   = cols.find((c) => /^EWeiDu$/i.test(c))  || cols.find((c) => /^e.*lat/i.test(c));
+  const endLngCol   = cols.find((c) => /^EJingDu$/i.test(c)) || cols.find((c) => /^e.*lo?n/i.test(c));
+  // Odometer cols for distance
+  const sOdoCol = cols.find((c) => /^SLiCheng$/i.test(c));
+  const eOdoCol = cols.find((c) => /^ELiCheng$/i.test(c));
   console.log(`Coord cols: sLat=${startLatCol} sLng=${startLngCol} eLat=${endLatCol} eLng=${endLngCol}`);
-  console.log(`Miles col: ${milesCol}`);
+  console.log(`Odometer cols: start=${sOdoCol} end=${eOdoCol}`);
 
   // ── 2. Discover GPS track tables ─────────────────────────────────────────────
   const [trackTbls] = await conn.query(`
@@ -118,25 +121,31 @@ function addSheet(wb, data, sheetName) {
   console.log(`Track tables: ${trackTbls.map((t) => `${t.TABLE_NAME}(~${t.TABLE_ROWS})`).join(', ')}`);
 
   // ── 3. Fetch Distribution daily records (last 6 months, fuel present) ────────
-  const coordSelect = startLatCol
+  const coordSelect = (startLatCol && endLatCol)
     ? `, vd.${startLatCol}/1000000 AS sLat, vd.${startLngCol}/1000000 AS sLng,
-         vd.${endLatCol}/1000000 AS eLat, vd.${endLngCol}/1000000 AS eLng`
+         vd.${endLatCol}/1000000   AS eLat, vd.${endLngCol}/1000000   AS eLng`
     : ', NULL AS sLat, NULL AS sLng, NULL AS eLat, NULL AS eLng';
 
-  const distSelect = milesCol
-    ? `, vd.${milesCol}/10 AS distKm`
+  // Distance from odometer diff (units are 0.1 km → ÷10 for km); guard against rollover
+  const distSelect = (sOdoCol && eOdoCol)
+    ? `, CASE WHEN vd.${eOdoCol} > vd.${sOdoCol}
+              THEN (CAST(vd.${eOdoCol} AS SIGNED) - CAST(vd.${sOdoCol} AS SIGNED)) / 10
+              ELSE NULL END AS distKm`
     : ', NULL AS distKm';
 
   const [rows] = await conn.query(`
     SELECT
-      vi.ID                                                      AS vehiID,
+      vi.ID                                                           AS vehiID,
       TRIM(REPLACE(REPLACE(vi.VehiIDNO,'(CANTER)',''),'(TRUCK)','')) AS plate,
-      vi.VehiIDNO                                                AS plateRaw,
-      co.Name                                                    AS company,
-      vd.GPSDate                                                 AS date,
-      vd.SYouLiang / 100                                         AS startFuelL,
-      vd.EYouLiang / 100                                         AS endFuelL,
-      (vd.SYouLiang - vd.EYouLiang) / 100                       AS usedFuelL
+      vi.VehiIDNO                                                     AS plateRaw,
+      co.Name                                                         AS company,
+      vd.GPSDate                                                      AS date,
+      vd.SYouLiang / 100                                              AS startFuelL,
+      vd.EYouLiang / 100                                              AS endFuelL,
+      -- UNSIGNED subtraction overflows when EYouLiang > SYouLiang (refuel day)
+      CASE WHEN vd.SYouLiang >= vd.EYouLiang
+           THEN (CAST(vd.SYouLiang AS SIGNED) - CAST(vd.EYouLiang AS SIGNED)) / 100
+           ELSE NULL END                                              AS usedFuelL
       ${coordSelect}
       ${distSelect}
     FROM jt808_vehicle_daily vd
@@ -146,37 +155,77 @@ function addSheet(wb, data, sheetName) {
       AND vd.GPSDate >= DATE_SUB(CURDATE(), INTERVAL 180 DAY)
       AND vd.SYouLiang > 0
       AND vd.EYouLiang > 0
+      AND vd.SYouLiang >= vd.EYouLiang   -- skip refuel days (fuel went up)
     ORDER BY vd.GPSDate DESC, vi.VehiIDNO`);
 
   console.log(`Fetched ${rows.length} daily fuel records`);
 
-  // ── 4. Probe GPS track table for coordinate scale ─────────────────────────────
-  let trackTable = null, tLatCol = null, tLngCol = null, tTimeCol = null, tVidCol = null;
-  let coordScale = 1000000; // CMSV6 default: int * 1e-6 = degrees
+  // ── 4. Probe GPS track tables ────────────────────────────────────────────────
+  // Tables are partitioned: jt808_vehicle_gps_N_YYYYMM (N=1..4, shard by device)
+  // We need to query all N shards for a given YYYYMM
+  let tLatCol = null, tLngCol = null, tTimeCol = null, tVidCol = null;
+  let coordScale = 1000000;
+  let trackTableBase = null; // e.g. "jt808_vehicle_gps"
+  let allTrackTableNames = new Set(); // full names present in DB
 
   if (trackTbls.length) {
-    trackTable = trackTbls[0].TABLE_NAME;
+    // Probe columns from the first table
+    const firstTable = trackTbls[0].TABLE_NAME;
     const [tCols] = await conn.query(`
-      SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.COLUMNS
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
       WHERE TABLE_SCHEMA='1010GPS' AND TABLE_NAME=?
-      ORDER BY ORDINAL_POSITION LIMIT 30`, [trackTable]);
+      ORDER BY ORDINAL_POSITION LIMIT 30`, [firstTable]);
     const tc = tCols.map((r) => r.COLUMN_NAME);
-    console.log(`Track table '${trackTable}' cols: ${tc.join(', ')}`);
+    console.log(`Track table '${firstTable}' cols: ${tc.join(', ')}`);
 
-    tLatCol  = tc.find((c) => /^lat/i.test(c));
-    tLngCol  = tc.find((c) => /^lo?ng/i.test(c));
-    tTimeCol = tc.find((c) => /time|gpstime|gt/i.test(c));
-    tVidCol  = tc.find((c) => /vehi.*id|device.*id|vid/i.test(c)) || 'VehiID';
+    // CMSV6 Chinese GPS cols: WeiDu=latitude, JingDu=longitude, GPSTime=timestamp
+    tLatCol  = tc.find((c) => /^WeiDu$/i.test(c))  || tc.find((c) => /^lat/i.test(c));
+    tLngCol  = tc.find((c) => /^JingDu$/i.test(c)) || tc.find((c) => /^lo?ng/i.test(c));
+    tTimeCol = tc.find((c) => /^GPSTime$/i.test(c)) || tc.find((c) => /time|gpstime/i.test(c));
+    tVidCol  = tc.find((c) => /^VehiID$/i.test(c)) || tc.find((c) => /vehi.*id|vid/i.test(c)) || 'VehiID';
 
-    // Sample a known-good point to detect scale
+    // Detect coordinate scale from sample
     const [samp] = await conn.query(
-      `SELECT ${tLatCol} AS lat, ${tLngCol} AS lng FROM ${trackTable} LIMIT 1`);
+      `SELECT ${tLatCol} AS lat FROM ${firstTable} WHERE ${tLatCol} != 0 LIMIT 1`);
     if (samp.length) {
       const lat = Number(samp[0].lat);
-      if (Math.abs(lat) > 90) coordScale = 1000000;
-      else coordScale = 1;
-      console.log(`Track coord scale: ÷${coordScale}  sample lat=${lat}`);
+      coordScale = Math.abs(lat) > 90 ? 1000000 : 1;
+      console.log(`Track scale: ÷${coordScale}  sample lat=${lat}`);
     }
+
+    // Collect all table names matching the partition pattern
+    trackTbls.forEach((t) => allTrackTableNames.add(t.TABLE_NAME));
+
+    // Extract base name pattern (e.g. "jt808_vehicle_gps")
+    const m = firstTable.match(/^(.+?)_\d+_\d{6}$/);
+    trackTableBase = m ? m[1] : null;
+    console.log(`Track base: ${trackTableBase}, shards known: ${allTrackTableNames.size}`);
+  }
+
+  // Helper: get all shard table names for a given YYYYMM
+  function trackTablesForMonth(yyyymm) {
+    const tables = [];
+    for (let n = 1; n <= 4; n++) {
+      const name = `${trackTableBase}_${n}_${yyyymm}`;
+      if (allTrackTableNames.has(name)) tables.push(name);
+    }
+    return tables;
+  }
+
+  // Query GPS points for a vehicle on a date across all shards
+  async function getTrackPoints(vehiID, ds) {
+    if (!trackTableBase || !tLatCol) return [];
+    const yyyymm = ds.replace(/-/g, '').slice(0, 6);
+    const tables = trackTablesForMonth(yyyymm);
+    if (!tables.length) return [];
+
+    const unionParts = tables.map(
+      (t) => `SELECT ${tLatCol}/${coordScale} AS lat, ${tLngCol}/${coordScale} AS lng, ${tTimeCol} AS t
+               FROM ${t} WHERE ${tVidCol}=${conn.escape(vehiID)} AND DATE(${tTimeCol})=${conn.escape(ds)}`
+    );
+    const sql = unionParts.join(' UNION ALL ') + ` ORDER BY t`;
+    const [pts] = await conn.query(sql).catch(() => [[]]);
+    return pts;
   }
 
   // ── 5. Classify trips into routes ────────────────────────────────────────────
@@ -211,26 +260,15 @@ function addSheet(wb, data, sheetName) {
     }
   }
 
-  // ── 6. Detect Ubungo intermediate stops via GPS track ─────────────────────────
-  if (trackTable && tLatCol && (bucket.mbogaPortDirect.length || !hasCoords)) {
-    console.log('\nChecking Ubungo stops via GPS track table...');
+  // ── 6. Detect routes + Ubungo stops via GPS track ────────────────────────────
+  if (trackTableBase && tLatCol && (bucket.mbogaPortDirect.length || !hasCoords)) {
+    console.log('\nClassifying trips via GPS track tables (may take a minute)...');
 
-    // If no daily coords, scan all records for route classification
-    const toCheck = hasCoords
-      ? bucket.mbogaPortDirect
-      : rows.slice(0, 1000); // limit for performance
-
+    const toCheck = hasCoords ? bucket.mbogaPortDirect : rows.slice(0, 1000);
     let checked = 0;
     for (const r of toCheck) {
       const ds = dateStr(r.date);
-      const [pts] = await conn.query(
-        `SELECT ${tLatCol}/${coordScale} AS lat, ${tLngCol}/${coordScale} AS lng
-         FROM ${trackTable}
-         WHERE ${tVidCol} = ?
-           AND DATE(${tTimeCol}) = ?
-         ORDER BY ${tTimeCol}`,
-        [r.vehiID, ds]
-      ).catch(() => [[]]);
+      const pts = await getTrackPoints(r.vehiID, ds);
 
       if (!pts.length) continue;
       checked++;
