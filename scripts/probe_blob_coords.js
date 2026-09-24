@@ -22,13 +22,13 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 
 function parseGPSBlob(buf) {
   if (!Buffer.isBuffer(buf) || buf.length < 72) return [];
-  // Each 72-byte record: [36-byte metadata][36-byte GPS data]
-  // GPS half: lng at +38, lat at +42 from record start
+  // Blob records: 144 bytes each; GPS coords in bytes 40-43 (lng) and 44-47 (lat)
+  // Read with stride 72 — even offsets hit real GPS data, odd offsets hit zeros (filtered)
   const RECORD = 72;
   const pts = [];
   for (let off = 0; off + RECORD <= buf.length; off += RECORD) {
-    const lng = buf.readInt32LE(off + 38) / 1e6;
-    const lat = buf.readInt32LE(off + 42) / 1e6;
+    const lng = buf.readInt32LE(off + 40) / 1e6;
+    const lat = buf.readInt32LE(off + 44) / 1e6;
     if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180 &&
         (Math.abs(lat) > 0.01 || Math.abs(lng) > 0.01)) pts.push({ lat, lng });
   }
