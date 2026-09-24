@@ -245,9 +245,11 @@ function addSheet(wb, data, sheetName) {
     r.lPer100km  = r.distKm && r.usedFuelL > 0 ? fmt2(r.usedFuelL / r.distKm * 100) : null;
   }
 
-  // ── 6. Classify every trip via GPS blob ───────────────────────────────────────
-  // Daily SWeiDu/SJingDu are factory-default China coords — useless.
-  // All classification must come from the GPS track blobs.
+  // ── 6. Classify trips via GPS blob ───────────────────────────────────────────
+  // Strategy: vehicles typically park at ONE location per day. A route trip is
+  // detected when a vehicle is near waypoint A on day N and near waypoint B on
+  // day N+k (k ≤ 3 days). Same-day detection also works when the blob has
+  // varying coords (vehicle actually moving that day).
   const bucket = {
     mbogaPortDirect: [],
     mbogaPortUbungo: [],
@@ -256,13 +258,17 @@ function addSheet(wb, data, sheetName) {
   };
 
   if (trackTableBase) {
+    // ── Pass 1: record which waypoints each vehicle-day has GPS coverage for ──
     console.log(`\nScanning GPS blobs for ${rows.length} records (this takes 2-5 min)...`);
     let processed = 0, withBlob = 0;
+
+    // dayInfo[vehiID][ds] = { r, hitM, hitP, hitV, hitU }
+    const dayInfo = {};
 
     for (const r of rows) {
       processed++;
       if (processed % 100 === 0) {
-        process.stdout.write(`\r  ${processed}/${rows.length} processed, ${withBlob} blobs read, classified: M→P=${bucket.mbogaPortDirect.length+bucket.mbogaPortUbungo.length} P→V=${bucket.portVikindu.length} V→P=${bucket.vikindPort.length}   `);
+        process.stdout.write(`\r  ${processed}/${rows.length} scanned, ${withBlob} blobs read...   `);
       }
 
       const ds = dateStr(r.date);
@@ -270,42 +276,76 @@ function addSheet(wb, data, sheetName) {
       if (!pts.length) continue;
       withBlob++;
 
-      const first = pts[0], last = pts[pts.length - 1];
       const hitM = pts.some((p) => isNear(p.lat, p.lng, WP.MBOGA));
       const hitP = pts.some((p) => isNear(p.lat, p.lng, WP.PORT));
       const hitV = pts.some((p) => isNear(p.lat, p.lng, WP.VIKINDU));
       const hitU = pts.some((p) => isNear(p.lat, p.lng, WP.UBUNGO));
 
-      // Route: start near Mboga AND visited Port (end there or passed through)
-      const fromM = isNear(first.lat, first.lng, WP.MBOGA) || hitM;
-      const fromP = isNear(first.lat, first.lng, WP.PORT);
-      const fromV = isNear(first.lat, first.lng, WP.VIKINDU) || hitV;
-      const toP   = isNear(last.lat,  last.lng,  WP.PORT)    || hitP;
-      const toV   = isNear(last.lat,  last.lng,  WP.VIKINDU) || hitV;
-
-      if (hitM && hitP && !hitV) {
-        // Mboga ↔ Port trip
-        // "from Mboga" = first point closer to Mboga than Port
-        const firstDistM = haversineKm(first.lat, first.lng, WP.MBOGA.lat, WP.MBOGA.lng);
-        const firstDistP = haversineKm(first.lat, first.lng, WP.PORT.lat,  WP.PORT.lng);
-        if (firstDistM <= firstDistP) {
-          // Mboga → Port direction
-          r._viaUbungo = hitU;
-          if (hitU) bucket.mbogaPortUbungo.push(r);
-          else       bucket.mbogaPortDirect.push(r);
-        }
-        // Port → Mboga direction is not one of our target routes, skip
-      } else if (hitP && hitV) {
-        // Port ↔ Vikindu trip
-        const firstDistP = haversineKm(first.lat, first.lng, WP.PORT.lat,    WP.PORT.lng);
-        const firstDistV = haversineKm(first.lat, first.lng, WP.VIKINDU.lat, WP.VIKINDU.lng);
-        if (firstDistP <= firstDistV) bucket.portVikindu.push(r);
-        else                           bucket.vikindPort.push(r);
-      }
+      if (!dayInfo[r.vehiID]) dayInfo[r.vehiID] = {};
+      dayInfo[r.vehiID][ds] = { r, hitM, hitP, hitV, hitU };
     }
 
     process.stdout.write('\n');
     console.log(`  Blobs read: ${withBlob} / ${rows.length}`);
+
+    // ── Pass 2: classify routes via same-day AND consecutive-day transitions ──
+    // WINDOW: if vehicle at waypoint A on day N, look up to 3 days later for waypoint B
+    const WINDOW_DAYS = 3;
+
+    for (const [, vDays] of Object.entries(dayInfo)) {
+      const sortedDates = Object.keys(vDays).sort();
+
+      for (let i = 0; i < sortedDates.length; i++) {
+        const dsA = sortedDates[i];
+        const infoA = vDays[dsA];
+        if (!infoA.hitM && !infoA.hitP && !infoA.hitV) continue; // not near any waypoint
+
+        // Look ahead within window
+        for (let j = i; j < sortedDates.length; j++) {
+          const dsB = sortedDates[j];
+          const infoB = vDays[dsB];
+          const gapDays = (new Date(dsB) - new Date(dsA)) / 86400000;
+          if (gapDays > WINDOW_DAYS) break;
+
+          // Skip same-record unless it already has both waypoints
+          if (j === i && !(infoA.hitM && infoA.hitP) && !(infoA.hitP && infoA.hitV) && !(infoA.hitV && infoA.hitP)) continue;
+
+          const fromM = infoA.hitM;
+          const fromP = infoA.hitP;
+          const fromV = infoA.hitV;
+          const toP   = infoB.hitP;
+          const toV   = infoB.hitV;
+          const toU   = infoB.hitU;
+
+          // Mboga → Port
+          if (fromM && toP && !infoB.hitV) {
+            const r = infoB.r;
+            r._arrivalDate = dsB;
+            r._departureDate = dsA;
+            r._viaUbungo = toU || infoA.hitU;
+            if (r._viaUbungo) bucket.mbogaPortUbungo.push(r);
+            else               bucket.mbogaPortDirect.push(r);
+            break; // only classify once per departure day
+          }
+          // Port → Vikindu
+          if (fromP && toV && !infoB.hitM) {
+            const r = infoB.r;
+            r._arrivalDate = dsB;
+            r._departureDate = dsA;
+            bucket.portVikindu.push(r);
+            break;
+          }
+          // Vikindu → Port
+          if (fromV && toP && !infoB.hitM) {
+            const r = infoB.r;
+            r._arrivalDate = dsB;
+            r._departureDate = dsA;
+            bucket.vikindPort.push(r);
+            break;
+          }
+        }
+      }
+    }
   }
 
   await conn.end();
@@ -326,17 +366,18 @@ function addSheet(wb, data, sheetName) {
   // ── 8. Build row mapper ───────────────────────────────────────────────────────
   function tripRow(r, direction) {
     return {
-      Date:             dateStr(r.date),
-      Direction:        direction,
-      'Via Ubungo':     r._viaUbungo ? 'YES' : (direction.includes('Mboga') ? 'NO' : '—'),
-      Vehicle:          r.plate,
-      Company:          r.company,
-      'Start Fuel (L)': r.startFuelL,
-      'End Fuel (L)':   r.endFuelL,
-      'Used Fuel (L)':  r.usedFuelL,
-      'Distance (km)':  r.distKm,
-      'km/L':           r.kmPerL,
-      'L/100km':        r.lPer100km,
+      'Departure Date':  r._departureDate || dateStr(r.date),
+      'Arrival Date':    r._arrivalDate   || dateStr(r.date),
+      Direction:         direction,
+      'Via Ubungo':      r._viaUbungo ? 'YES' : (direction.includes('Mboga') ? 'NO' : '—'),
+      Vehicle:           r.plate,
+      Company:           r.company,
+      'Start Fuel (L)':  r.startFuelL,
+      'End Fuel (L)':    r.endFuelL,
+      'Used Fuel (L)':   r.usedFuelL,
+      'Distance (km)':   r.distKm,
+      'km/L':            r.kmPerL,
+      'L/100km':         r.lPer100km,
     };
   }
 
