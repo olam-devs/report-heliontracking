@@ -7,22 +7,27 @@
  *   3. Port Dar → Vikindu
  *   4. Vikindu → Port Dar
  *
+ * Fuel methodology (matches Dar↔Mboga analysis):
+ *   Used = StartFuel(depDay) + Refueled(all days in window) − EndFuel(arrDay)
+ *
+ * Distance methodology:
+ *   Sum of haversine segments from GPS blobs across all days in trip window.
+ *   Jumps > 5 km between consecutive points are skipped (GPS dropout).
+ *
  * Run on VPS:
- *   cd /root && node generate_routes_analytics.js
+ *   cd /root && node scripts/generate_routes_analytics.js
  *
  * Requires: mysql2, xlsx  (npm install mysql2 xlsx  if not present)
- * Output:   /root/Fleet_Routes_Analytics.xlsx
+ * Output:   Fleet_Routes_Analytics.xlsx  (repo root, next to scripts/)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-// Try to require xlsx — install path may vary
 let XLSX;
 try { XLSX = require('xlsx'); }
 catch { XLSX = require('/root/node_modules/xlsx'); }
 
 const mysql = require('mysql2/promise');
 const path  = require('path');
-const os    = require('os');
 
 const DB = {
   host: '127.0.0.1',
@@ -33,18 +38,22 @@ const DB = {
 };
 
 // ─── WAYPOINTS ────────────────────────────────────────────────────────────────
-// All coords in decimal degrees; radiusKm = detection radius around point
 const WP = {
-  // Mboga Market, Dar es Salaam
-  MBOGA:   { lat: -6.7966, lng: 39.2167, radiusKm: 1.5,  label: 'Mboga Market' },
-  // Dar es Salaam Port (Bandarini) — large radius covers whole port area
-  // 6°50'31.8"S 39°17'44.9"E = -6.84217, 39.29581
-  PORT:    { lat: -6.8422, lng: 39.2958, radiusKm: 3.0,  label: 'Port Dar (Bandarini)' },
-  // Vikindu — from live GPS screenshot: -7.014427, 39.307330
-  VIKINDU: { lat: -7.0144, lng: 39.3073, radiusKm: 1.5,  label: 'Vikindu' },
-  // Ubungo interchange (common Dar stopover point)
-  UBUNGO:  { lat: -6.7925, lng: 39.2094, radiusKm: 1.2,  label: 'Ubungo' },
+  MBOGA:   { lat: -6.7966, lng: 39.2167, radiusKm: 1.5, label: 'Mboga Market' },
+  PORT:    { lat: -6.8422, lng: 39.2958, radiusKm: 3.0, label: 'Port Dar (Bandarini)' },
+  VIKINDU: { lat: -7.0144, lng: 39.3073, radiusKm: 1.5, label: 'Vikindu' },
+  UBUNGO:  { lat: -6.7925, lng: 39.2094, radiusKm: 1.2, label: 'Ubungo' },
 };
+
+// ─── FUEL RATING THRESHOLDS (L/km) ───────────────────────────────────────────
+// Calibrated for heavy trucks on Dar urban/peri-urban routes
+function fuelRating(lPerKm) {
+  if (lPerKm == null) return '—';
+  if (lPerKm < 0.30)  return '✅ Excellent';
+  if (lPerKm < 0.40)  return '✅ Good';
+  if (lPerKm < 0.55)  return '⚠️ Slightly High';
+  return '🔴 Above Normal';
+}
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -61,6 +70,7 @@ const isNear = (lat, lng, wp) =>
   lat != null && lng != null && haversineKm(lat, lng, wp.lat, wp.lng) <= wp.radiusKm;
 
 const fmt2 = (n) => { const v = Number(n); return (n != null && isFinite(v) ? +v.toFixed(2) : null); };
+const fmt3 = (n) => { const v = Number(n); return (n != null && isFinite(v) ? +v.toFixed(3) : null); };
 
 const safeName = (s) => String(s).replace(/[\\/?*[\]:]/g, '').slice(0, 28);
 
@@ -68,6 +78,28 @@ function dateStr(d) {
   if (!d) return '';
   if (d instanceof Date) return d.toISOString().slice(0, 10);
   return String(d).slice(0, 10);
+}
+
+// All calendar dates from dsA to dsB inclusive
+function dateRange(dsA, dsB) {
+  const dates = [];
+  let cur = new Date(dsA);
+  const end = new Date(dsB);
+  while (cur <= end) {
+    dates.push(cur.toISOString().slice(0, 10));
+    cur = new Date(cur.getTime() + 86400000);
+  }
+  return dates;
+}
+
+// Sum distance from GPS points, skipping jumps > 5 km (GPS dropout)
+function trackDistanceKm(pts) {
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const d = haversineKm(pts[i - 1].lat, pts[i - 1].lng, pts[i].lat, pts[i].lng);
+    if (d < 5) total += d;
+  }
+  return total;
 }
 
 // ─── EXCEL HELPERS ───────────────────────────────────────────────────────────
@@ -78,8 +110,7 @@ function addSheet(wb, data, sheetName) {
     const colCount = Object.keys(data[0]).length;
     ws['!autofilter'] = { ref: `A1:${XLSX.utils.encode_col(colCount - 1)}1` };
   }
-  // Column widths
-  ws['!cols'] = Array(Object.keys(data[0] || {}).length).fill({ wch: 16 });
+  ws['!cols'] = Array(Object.keys(data[0] || {}).length).fill({ wch: 18 });
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
 }
 
@@ -88,29 +119,7 @@ function addSheet(wb, data, sheetName) {
   const conn = await mysql.createConnection(DB);
   console.log('✅ Connected to CMSV6 DB (port 3311)');
 
-  // ── 1. Discover daily table columns ─────────────────────────────────────────
-  const [colRows] = await conn.query(`
-    SELECT COLUMN_NAME FROM information_schema.COLUMNS
-    WHERE TABLE_SCHEMA='1010GPS' AND TABLE_NAME='jt808_vehicle_daily'
-    ORDER BY ORDINAL_POSITION`);
-  const cols = colRows.map((r) => r.COLUMN_NAME);
-  console.log(`Daily cols: ${cols.join(', ')}`);
-
-  // CMSV6 Chinese column names:
-  //   SWeiDu = start latitude (纬度), SJingDu = start longitude (经度)
-  //   EWeiDu = end latitude,           EJingDu = end longitude
-  //   SLiCheng = start odometer,       ELiCheng = end odometer (×0.1 km)
-  const startLatCol = cols.find((c) => /^SWeiDu$/i.test(c))  || cols.find((c) => /^s.*lat/i.test(c));
-  const startLngCol = cols.find((c) => /^SJingDu$/i.test(c)) || cols.find((c) => /^s.*lo?n/i.test(c));
-  const endLatCol   = cols.find((c) => /^EWeiDu$/i.test(c))  || cols.find((c) => /^e.*lat/i.test(c));
-  const endLngCol   = cols.find((c) => /^EJingDu$/i.test(c)) || cols.find((c) => /^e.*lo?n/i.test(c));
-  // Odometer cols for distance
-  const sOdoCol = cols.find((c) => /^SLiCheng$/i.test(c));
-  const eOdoCol = cols.find((c) => /^ELiCheng$/i.test(c));
-  console.log(`Coord cols: sLat=${startLatCol} sLng=${startLngCol} eLat=${endLatCol} eLng=${endLngCol}`);
-  console.log(`Odometer cols: start=${sOdoCol} end=${eOdoCol}`);
-
-  // ── 2. Discover GPS track tables ─────────────────────────────────────────────
+  // ── 1. Discover GPS track tables ─────────────────────────────────────────────
   const [trackTbls] = await conn.query(`
     SELECT TABLE_NAME, TABLE_ROWS
     FROM information_schema.TABLES
@@ -120,16 +129,14 @@ function addSheet(wb, data, sheetName) {
     ORDER BY TABLE_ROWS DESC LIMIT 15`);
   console.log(`Track tables: ${trackTbls.map((t) => `${t.TABLE_NAME}(~${t.TABLE_ROWS})`).join(', ')}`);
 
-  // ── 3. Fetch Distribution daily records (last 6 months, fuel present) ────────
-  const coordSelect = (startLatCol && endLatCol)
-    ? `, vd.${startLatCol}/1000000 AS sLat, vd.${startLngCol}/1000000 AS sLng,
-         vd.${endLatCol}/1000000   AS eLat, vd.${endLngCol}/1000000   AS eLng`
-    : ', NULL AS sLat, NULL AS sLng, NULL AS eLat, NULL AS eLng';
+  const allTrackTableNames = new Set(trackTbls.map((t) => t.TABLE_NAME));
+  const trackBaseMatch = trackTbls[0]?.TABLE_NAME.match(/^(.+?)_\d+_\d{6}$/);
+  const trackTableBase = trackBaseMatch ? trackBaseMatch[1] : null;
+  console.log(`Track base: ${trackTableBase}  known shards: ${allTrackTableNames.size}`);
 
-  // Distance columns removed — CMSV6 odometer factory-defaulted to 0 on most vehicles;
-  // the delta reflects lifetime accumulated km, not per-trip distance. Not useful here.
-  const distSelect = ', NULL AS distKm'; // kept in query shape for compatibility, not output
-
+  // ── 2. Fetch ALL daily records — no fuel-direction filter ─────────────────────
+  // We need ALL days (including refuel days) so we can compute:
+  //   used = startFuel(depDay) + sum(refueling events in window) − endFuel(arrDay)
   const [rows] = await conn.query(`
     SELECT
       vi.ID                                                           AS vehiID,
@@ -138,44 +145,34 @@ function addSheet(wb, data, sheetName) {
       co.Name                                                         AS company,
       vd.GPSDate                                                      AS date,
       vd.SYouLiang / 100                                              AS startFuelL,
-      vd.EYouLiang / 100                                              AS endFuelL,
-      -- UNSIGNED subtraction overflows when EYouLiang > SYouLiang (refuel day)
-      CASE WHEN vd.SYouLiang >= vd.EYouLiang
-           THEN (CAST(vd.SYouLiang AS SIGNED) - CAST(vd.EYouLiang AS SIGNED)) / 100
-           ELSE NULL END                                              AS usedFuelL
-      ${coordSelect}
-      ${distSelect}
+      vd.EYouLiang / 100                                              AS endFuelL
     FROM jt808_vehicle_daily vd
     JOIN jt808_vehicle_info  vi ON vi.ID = vd.VehiID
     JOIN jt808_company_info  co ON co.ID = vi.CompanyID
-    WHERE co.ID = 3                          -- SEMI group
+    WHERE co.ID = 3
       AND vd.GPSDate >= DATE_SUB(CURDATE(), INTERVAL 180 DAY)
       AND vd.SYouLiang > 0
       AND vd.EYouLiang > 0
-      AND vd.SYouLiang >= vd.EYouLiang   -- skip refuel days (fuel went up)
-    ORDER BY vd.GPSDate DESC, vi.VehiIDNO`);
+    ORDER BY vi.ID, vd.GPSDate`);
 
-  console.log(`Fetched ${rows.length} daily fuel records`);
+  console.log(`Fetched ${rows.length} daily records (all days, incl. refuel days)`);
 
-  // ── 4. Set up GPS track table lookup ─────────────────────────────────────────
-  // Tables: jt808_vehicle_gps_N_YYYYMM (N=1..4, monthly partitions)
-  // Each row: VehiID, DevIDNO, GPSDate, GPSData (mediumblob)
-  // GPSData binary format:
-  //   - Bytes 0-35: header (skip)
-  //   - Bytes 36, 72, 108 ... : GPS records, each 36 bytes
-  //   Within each 36-byte GPS record:
-  //     - offset 3: longitude  (signed LE int32, ÷1e6 = degrees East)
-  //     - offset 7: latitude   (signed LE int32, ÷1e6 = degrees, negative = South)
+  // Build lookup: dailyByVehicle[vehiID][ds] = { plate, company, startFuelL, endFuelL }
+  const dailyByVehicle = {};
+  for (const r of rows) {
+    const ds = dateStr(r.date);
+    if (!dailyByVehicle[r.vehiID]) dailyByVehicle[r.vehiID] = {};
+    dailyByVehicle[r.vehiID][ds] = {
+      plate:       r.plate,
+      company:     r.company,
+      startFuelL:  fmt2(r.startFuelL),
+      endFuelL:    fmt2(r.endFuelL),
+    };
+  }
 
-  const allTrackTableNames = new Set(trackTbls.map((t) => t.TABLE_NAME));
-  const trackBaseMatch = trackTbls[0]?.TABLE_NAME.match(/^(.+?)_\d+_\d{6}$/);
-  const trackTableBase = trackBaseMatch ? trackBaseMatch[1] : null;
-  console.log(`Track base: ${trackTableBase}  known shards: ${allTrackTableNames.size}`);
-
+  // ── 3. GPS blob parser + track table helpers ──────────────────────────────────
   function parseGPSBlob(buf) {
     if (!Buffer.isBuffer(buf) || buf.length < 72) return [];
-    // Blob records: 144 bytes each; GPS coords in bytes 40-43 (lng) and 44-47 (lat)
-    // Read with stride 72 — even offsets hit real GPS data, odd offsets hit zeros (filtered)
     const RECORD = 72;
     const pts = [];
     for (let off = 0; off + RECORD <= buf.length; off += RECORD) {
@@ -196,75 +193,104 @@ function addSheet(wb, data, sheetName) {
     return tables;
   }
 
-  // Vehicle→shard cache so we don't try all 4 shards every time
-  const vehicleShardCache = {}; // vehiID_yyyymm → shard table name or null
+  // Cache: vehiID_yyyymm → shard table name (or null)
+  const vehicleShardCache = {};
 
-  // Fetch and parse GPS points for a vehicle on a given date
+  // Cache: vehiID_ds → pts[]  (avoid double-fetching blobs used in Pass 1 and getTripMetrics)
+  const ptsCache = {};
+
   async function getTrackPoints(vehiID, ds) {
-    if (!trackTableBase) return [];
-    const yyyymm = ds.replace(/-/g, '').slice(0, 6);
-    const cacheKey = `${vehiID}_${yyyymm}`;
+    const cacheKey = `${vehiID}_${ds}`;
+    if (ptsCache[cacheKey] !== undefined) return ptsCache[cacheKey];
+    if (!trackTableBase) { ptsCache[cacheKey] = []; return []; }
 
-    // Use cached shard if known
-    if (vehicleShardCache[cacheKey] !== undefined) {
-      const cachedTable = vehicleShardCache[cacheKey];
-      if (!cachedTable) return [];
-      const [r] = await conn.query(
-        `SELECT GPSData FROM ${cachedTable} WHERE VehiID = ? AND GPSDate = ? LIMIT 1`,
-        [vehiID, ds]
-      ).catch(() => [[]]);
-      return (r.length && r[0].GPSData) ? parseGPSBlob(r[0].GPSData) : [];
+    const yyyymm = ds.replace(/-/g, '').slice(0, 6);
+    const shardKey = `${vehiID}_${yyyymm}`;
+
+    let table = vehicleShardCache[shardKey];
+    if (table === undefined) {
+      // Try all shards for this month to find which one holds this vehicle
+      const tables = trackTablesForMonth(yyyymm);
+      table = null;
+      for (const t of tables) {
+        const [r] = await conn.query(
+          `SELECT 1 FROM ${t} WHERE VehiID = ? LIMIT 1`, [vehiID]
+        ).catch(() => [[]]);
+        if (r.length) { table = t; break; }
+      }
+      vehicleShardCache[shardKey] = table;
     }
 
-    // Try all shards for this month
-    const tables = trackTablesForMonth(yyyymm);
-    for (const t of tables) {
-      const [r] = await conn.query(
-        `SELECT GPSData FROM ${t} WHERE VehiID = ? AND GPSDate = ? LIMIT 1`,
-        [vehiID, ds]
-      ).catch(() => [[]]);
-      if (r.length && r[0].GPSData) {
-        vehicleShardCache[cacheKey] = t; // remember this shard
-        return parseGPSBlob(r[0].GPSData);
+    if (!table) { ptsCache[cacheKey] = []; return []; }
+
+    const [r] = await conn.query(
+      `SELECT GPSData FROM ${table} WHERE VehiID = ? AND GPSDate = ? LIMIT 1`,
+      [vehiID, ds]
+    ).catch(() => [[]]);
+
+    const pts = (r.length && r[0].GPSData) ? parseGPSBlob(r[0].GPSData) : [];
+    ptsCache[cacheKey] = pts;
+    return pts;
+  }
+
+  // ── 4. Compute trip fuel and GPS distance across the full window ───────────────
+  // Formula: used = startFuel(depDay) + Σrefueled(all days in window) − endFuel(arrDay)
+  // GPS distance: sum haversine segments from blobs for every day in window
+  function getTripMetrics(vehiID, dsA, dsB) {
+    const vDays = dailyByVehicle[vehiID] || {};
+    const depDay = vDays[dsA];
+    const arrDay = vDays[dsB];
+    if (!depDay || !arrDay) return null;
+
+    const startFuel = depDay.startFuelL;
+    const endFuel   = arrDay.endFuelL;
+
+    // Sum refueling: any day in window where endFuel > startFuel
+    let refueled = 0;
+    for (const ds of dateRange(dsA, dsB)) {
+      const day = vDays[ds];
+      if (day && day.endFuelL > day.startFuelL) {
+        refueled += day.endFuelL - day.startFuelL;
       }
     }
-    vehicleShardCache[cacheKey] = null;
-    return [];
+
+    const usedFuel = fmt2(startFuel + refueled - endFuel);
+
+    // GPS distance: sum cached blobs across window
+    let distKm = 0;
+    for (const ds of dateRange(dsA, dsB)) {
+      const pts = ptsCache[`${vehiID}_${ds}`] || [];
+      distKm += trackDistanceKm(pts);
+    }
+    distKm = fmt2(distKm);
+
+    const lPerKm = (distKm > 0 && usedFuel != null && usedFuel > 0)
+      ? fmt3(usedFuel / distKm)
+      : null;
+
+    return {
+      startFuel:  fmt2(startFuel),
+      refueled:   fmt2(refueled),
+      endFuel:    fmt2(endFuel),
+      usedFuel:   (usedFuel != null && usedFuel > 0) ? usedFuel : null,
+      distKm:     distKm > 0 ? distKm : null,
+      lPerKm,
+      rating:     fuelRating(lPerKm),
+    };
   }
 
-  // ── 5. Normalise fuel on all rows (distance dropped — odometer unreliable) ─────
-  for (const r of rows) {
-    r.usedFuelL  = fmt2(r.usedFuelL);
-    r.startFuelL = fmt2(r.startFuelL);
-    r.endFuelL   = fmt2(r.endFuelL);
-    // distKm, kmPerL, lPer100km removed: CMSV6 odometer default=0 on most vehicles
-    // so ELiCheng-SLiCheng reflects lifetime accumulated km, not trip distance.
-  }
-
-  // ── 6. Classify trips via GPS blob ───────────────────────────────────────────
-  // Strategy: vehicles typically park at ONE location per day. A route trip is
-  // detected when a vehicle is near waypoint A on day N and near waypoint B on
-  // day N+k (k ≤ 3 days). Same-day detection also works when the blob has
-  // varying coords (vehicle actually moving that day).
-  const bucket = {
-    mbogaPortDirect: [],
-    mbogaPortUbungo: [],
-    portVikindu:     [],
-    vikindPort:      [],
-  };
+  // ── 5. Pass 1: scan GPS blobs, record waypoint hits per vehicle-day ───────────
+  // Use only records where GPS blob exists (skip days with no movement data)
+  const dayInfo = {}; // dayInfo[vehiID][ds] = { r, hitM, hitP, hitV, hitU }
 
   if (trackTableBase) {
-    // ── Pass 1: record which waypoints each vehicle-day has GPS coverage for ──
-    console.log(`\nScanning GPS blobs for ${rows.length} records (this takes 2-5 min)...`);
+    console.log(`\nPass 1: scanning GPS blobs for ${rows.length} records...`);
     let processed = 0, withBlob = 0;
-
-    // dayInfo[vehiID][ds] = { r, hitM, hitP, hitV, hitU }
-    const dayInfo = {};
 
     for (const r of rows) {
       processed++;
       if (processed % 100 === 0) {
-        process.stdout.write(`\r  ${processed}/${rows.length} scanned, ${withBlob} blobs read...   `);
+        process.stdout.write(`\r  ${processed}/${rows.length} scanned, ${withBlob} blobs...   `);
       }
 
       const ds = dateStr(r.date);
@@ -278,95 +304,83 @@ function addSheet(wb, data, sheetName) {
       const hitU = pts.some((p) => isNear(p.lat, p.lng, WP.UBUNGO));
 
       if (!dayInfo[r.vehiID]) dayInfo[r.vehiID] = {};
-      dayInfo[r.vehiID][ds] = { r, hitM, hitP, hitV, hitU };
+      // Store only if vehicle was near at least one waypoint (prune noise)
+      if (hitM || hitP || hitV || hitU) {
+        dayInfo[r.vehiID][ds] = { r, hitM, hitP, hitV, hitU };
+      }
     }
 
     process.stdout.write('\n');
     console.log(`  Blobs read: ${withBlob} / ${rows.length}`);
+  }
 
-    // ── Pass 2: classify routes via same-day AND consecutive-day transitions ──
-    // WINDOW: if vehicle at waypoint A on day N, look up to 3 days later for waypoint B
-    const WINDOW_DAYS = 3;
+  // ── 6. Pass 2: classify route trips via consecutive-day transitions ────────────
+  const bucket = {
+    mbogaPortDirect: [],
+    mbogaPortUbungo: [],
+    portVikindu:     [],
+    vikindPort:      [],
+  };
 
-    // Track classified trips to prevent duplicates and double-classification
-    // Key: vehiID|departureDate  →  once a departure day fires a route, skip it
-    // Key: vehiID|departureDate|arrivalDate|dir  →  dedup identical trips
-    const usedDepartures = new Set();
-    const seenTrips = new Set();
+  const WINDOW_DAYS = 3;
+  const usedDepartures = new Set(); // vehiID|dsA → prevent one departure firing two routes
+  const seenTrips = new Set();       // vehiID|dsA|dsB|dir → prevent exact duplicates
 
-    for (const [, vDays] of Object.entries(dayInfo)) {
-      const sortedDates = Object.keys(vDays).sort();
+  for (const [vehiIDStr, vDays] of Object.entries(dayInfo)) {
+    const vehiID = Number(vehiIDStr);
+    const sortedDates = Object.keys(vDays).sort();
 
-      for (let i = 0; i < sortedDates.length; i++) {
-        const dsA = sortedDates[i];
-        const infoA = vDays[dsA];
-        if (!infoA.hitM && !infoA.hitP && !infoA.hitV) continue; // not near any waypoint
+    for (let i = 0; i < sortedDates.length; i++) {
+      const dsA   = sortedDates[i];
+      const infoA = vDays[dsA];
+      const depKey = `${vehiID}|${dsA}`;
+      if (usedDepartures.has(depKey)) continue;
 
-        const depKey = `${infoA.r.vehiID}|${dsA}`;
-        if (usedDepartures.has(depKey)) continue; // already classified from this departure day
+      for (let j = i; j < sortedDates.length; j++) {
+        const dsB   = sortedDates[j];
+        const infoB = vDays[dsB];
+        const gapDays = (new Date(dsB) - new Date(dsA)) / 86400000;
+        if (gapDays > WINDOW_DAYS) break;
 
-        // Look ahead within window
-        for (let j = i; j < sortedDates.length; j++) {
-          const dsB = sortedDates[j];
-          const infoB = vDays[dsB];
-          const gapDays = (new Date(dsB) - new Date(dsA)) / 86400000;
-          if (gapDays > WINDOW_DAYS) break;
+        // Same day needs both endpoints already present
+        if (j === i &&
+            !(infoA.hitM && infoA.hitP) &&
+            !(infoA.hitP && infoA.hitV) &&
+            !(infoA.hitV && infoA.hitP)) continue;
 
-          // Skip same-record unless it already has both waypoints
-          if (j === i && !(infoA.hitM && infoA.hitP) && !(infoA.hitP && infoA.hitV) && !(infoA.hitV && infoA.hitP)) continue;
+        const fromM = infoA.hitM, fromP = infoA.hitP, fromV = infoA.hitV;
+        const toP = infoB.hitP, toV = infoB.hitV, toU = infoB.hitU;
 
-          const fromM = infoA.hitM;
-          const fromP = infoA.hitP;
-          const fromV = infoA.hitV;
-          const toP   = infoB.hitP;
-          const toV   = infoB.hitV;
-          const toU   = infoB.hitU;
+        let bucketKey = null;
+        let viaUbungo = false;
 
-          let classified = false;
+        if (fromM && toP && !infoB.hitV) {
+          viaUbungo = toU || infoA.hitU;
+          bucketKey = viaUbungo ? 'mbogaPortUbungo' : 'mbogaPortDirect';
+        } else if (fromP && toV && !infoB.hitM) {
+          bucketKey = 'portVikindu';
+        } else if (fromV && toP && !infoB.hitM) {
+          bucketKey = 'vikindPort';
+        }
 
-          // Mboga → Port (takes priority over V→P when vehicle also touched Vikindu)
-          if (fromM && toP && !infoB.hitV) {
-            const r = { ...infoB.r };
-            r._arrivalDate = dsB;
-            r._departureDate = dsA;
-            r._viaUbungo = toU || infoA.hitU;
-            const dir = r._viaUbungo ? 'mbogaPortUbungo' : 'mbogaPortDirect';
-            const tripKey = `${r.vehiID}|${dsA}|${dsB}|${dir}`;
-            if (!seenTrips.has(tripKey)) {
-              seenTrips.add(tripKey);
-              bucket[dir].push(r);
-            }
-            classified = true;
+        if (bucketKey) {
+          const tripKey = `${vehiID}|${dsA}|${dsB}|${bucketKey}`;
+          if (!seenTrips.has(tripKey)) {
+            seenTrips.add(tripKey);
+            const metrics = getTripMetrics(vehiID, dsA, dsB);
+            const entry = {
+              vehiID,
+              plate:       infoA.r.plate,
+              company:     infoA.r.company,
+              _departureDate: dsA,
+              _arrivalDate:   dsB,
+              _viaUbungo:     viaUbungo,
+              _metrics:       metrics,
+            };
+            bucket[bucketKey].push(entry);
           }
-          // Port → Vikindu
-          else if (fromP && toV && !infoB.hitM) {
-            const r = { ...infoB.r };
-            r._arrivalDate = dsB;
-            r._departureDate = dsA;
-            const tripKey = `${r.vehiID}|${dsA}|${dsB}|portVikindu`;
-            if (!seenTrips.has(tripKey)) {
-              seenTrips.add(tripKey);
-              bucket.portVikindu.push(r);
-            }
-            classified = true;
-          }
-          // Vikindu → Port
-          else if (fromV && toP && !infoB.hitM) {
-            const r = { ...infoB.r };
-            r._arrivalDate = dsB;
-            r._departureDate = dsA;
-            const tripKey = `${r.vehiID}|${dsA}|${dsB}|vikindPort`;
-            if (!seenTrips.has(tripKey)) {
-              seenTrips.add(tripKey);
-              bucket.vikindPort.push(r);
-            }
-            classified = true;
-          }
-
-          if (classified) {
-            usedDepartures.add(depKey);
-            break; // only classify once per departure day
-          }
+          usedDepartures.add(depKey);
+          break;
         }
       }
     }
@@ -374,38 +388,37 @@ function addSheet(wb, data, sheetName) {
 
   await conn.end();
 
-  // ── 7. Print summary ──────────────────────────────────────────────────────────
+  // ── 7. Summary ────────────────────────────────────────────────────────────────
   console.log('\n─── Route summary ───────────────────────────────────');
-  console.log(`  Mboga → Port (direct):      ${bucket.mbogaPortDirect.length}`);
-  console.log(`  Mboga → Ubungo → Port:      ${bucket.mbogaPortUbungo.length}`);
-  console.log(`  Port → Vikindu:             ${bucket.portVikindu.length}`);
-  console.log(`  Vikindu → Port:             ${bucket.vikindPort.length}`);
+  console.log(`  Mboga → Port (direct):    ${bucket.mbogaPortDirect.length}`);
+  console.log(`  Mboga → Ubungo → Port:    ${bucket.mbogaPortUbungo.length}`);
+  console.log(`  Port → Vikindu:           ${bucket.portVikindu.length}`);
+  console.log(`  Vikindu → Port:           ${bucket.vikindPort.length}`);
   const total = Object.values(bucket).reduce((s, a) => s + a.length, 0);
-  console.log(`  TOTAL classified:           ${total} / ${rows.length}`);
-  if (total === 0) {
-    console.log('\n⚠  No trips matched any route. Daily table has no GPS coords and no track table found.');
-    console.log('   Output will show all Distribution fuel records with date/fuel columns for manual review.');
-  }
+  console.log(`  TOTAL:                    ${total}`);
 
-  // ── 8. Build row mapper ───────────────────────────────────────────────────────
-  // Filter out trips with 0 or null fuel used — sensor dead days, not real trips
+  // ── 8. Row builder ────────────────────────────────────────────────────────────
+  // A trip is "valid" if fuel used is ≥ 1L (filters sensor-dead days)
   function validTrips(arr) {
-    return arr.filter((r) => r.usedFuelL != null && r.usedFuelL >= 1);
+    return arr.filter((r) => r._metrics && r._metrics.usedFuel != null && r._metrics.usedFuel >= 1);
   }
 
   function tripRow(r, direction) {
+    const m = r._metrics || {};
     return {
-      'Departure Date':  r._departureDate || dateStr(r.date),
-      'Arrival Date':    r._arrivalDate   || dateStr(r.date),
-      Direction:         direction,
-      'Via Ubungo':      r._viaUbungo ? 'YES' : (direction.includes('Mboga') ? 'NO' : '—'),
-      Vehicle:           r.plate,
-      Company:           r.company,
-      'Start Fuel (L)':  r.startFuelL,
-      'End Fuel (L)':    r.endFuelL,
-      'Used Fuel (L)':   r.usedFuelL,
-      // Distance and efficiency removed: odometer factory-defaulted to 0 on most vehicles;
-      // ELiCheng−SLiCheng reflects lifetime accumulated km, not single-trip distance.
+      'Departure Date': r._departureDate,
+      'Arrival Date':   r._arrivalDate,
+      Direction:        direction,
+      'Via Ubungo':     r._viaUbungo ? 'YES' : (direction.includes('Mboga') ? 'NO' : '—'),
+      Vehicle:          r.plate,
+      Company:          r.company,
+      'Start Fuel (L)': m.startFuel   ?? null,
+      'Refueled (L)':   m.refueled    ?? 0,
+      'End Fuel (L)':   m.endFuel     ?? null,
+      'Used Fuel (L)':  m.usedFuel    ?? null,
+      'Distance (km)':  m.distKm      ?? null,
+      'L/km':           m.lPerKm      ?? null,
+      'Rating':         m.rating      ?? '—',
     };
   }
 
@@ -420,20 +433,33 @@ function addSheet(wb, data, sheetName) {
   function vehicleRanking(arr, dir) {
     const byV = {};
     for (const r of validTrips(arr)) {
-      if (!byV[r.plate]) byV[r.plate] = { trips: 0, fuel: 0, company: r.company };
+      const m = r._metrics || {};
+      if (!byV[r.plate]) byV[r.plate] = { trips: 0, fuel: 0, dist: 0, company: r.company };
       byV[r.plate].trips++;
-      byV[r.plate].fuel += r.usedFuelL || 0;
+      byV[r.plate].fuel += m.usedFuel || 0;
+      byV[r.plate].dist += m.distKm   || 0;
     }
-    return Object.entries(byV).map(([plate, v]) => ({
-      Rank:                   0,
-      Vehicle:                plate,
-      Company:                v.company,
-      Direction:              dir,
-      Trips:                  v.trips,
-      'Total Fuel Used (L)':  fmt2(v.fuel),
-      'Avg Fuel / Trip (L)':  v.trips > 0 ? fmt2(v.fuel / v.trips) : null,
-    }))
-    .sort((a, b) => (b['Total Fuel Used (L)'] ?? 0) - (a['Total Fuel Used (L)'] ?? 0))
+    return Object.entries(byV).map(([plate, v]) => {
+      const avgLPerKm = (v.dist > 0 && v.fuel > 0) ? fmt3(v.fuel / v.dist) : null;
+      return {
+        Rank:                    0,
+        Vehicle:                 plate,
+        Company:                 v.company,
+        Direction:               dir,
+        Trips:                   v.trips,
+        'Total Fuel Used (L)':   fmt2(v.fuel),
+        'Total Distance (km)':   v.dist > 0 ? fmt2(v.dist) : null,
+        'Avg Fuel / Trip (L)':   v.trips > 0 ? fmt2(v.fuel / v.trips) : null,
+        'Avg L/km':              avgLPerKm,
+        'Avg L/100km':           avgLPerKm ? fmt2(avgLPerKm * 100) : null,
+        'Rating':                fuelRating(avgLPerKm),
+      };
+    })
+    .sort((a, b) => {
+      // Sort: valid L/km ascending (best first), nulls last
+      const ka = a['Avg L/km'] ?? 999, kb = b['Avg L/km'] ?? 999;
+      return ka - kb;
+    })
     .map((r, i) => ({ ...r, Rank: i + 1 }));
   }
 
@@ -443,58 +469,39 @@ function addSheet(wb, data, sheetName) {
   const allClassified = [
     ...bucket.mbogaPortDirect.map((r) => ({ ...r, _dir: 'Mboga → Port (Direct)' })),
     ...bucket.mbogaPortUbungo.map((r) => ({ ...r, _dir: 'Mboga → Port (via Ubungo)' })),
-    ...bucket.portVikindu.map((r)    => ({ ...r, _dir: 'Port → Vikindu' })),
-    ...bucket.vikindPort.map((r)     => ({ ...r, _dir: 'Vikindu → Port' })),
+    ...bucket.portVikindu.map((r)     => ({ ...r, _dir: 'Port → Vikindu' })),
+    ...bucket.vikindPort.map((r)      => ({ ...r, _dir: 'Vikindu → Port' })),
   ];
 
-  // ── Sheet 1: Overall vehicle rankings (all routes, best km/L first) ───────────
-  if (allClassified.length) {
-    addSheet(wb, vehicleRanking(allClassified, 'All Routes'), '📊 Overall Rankings');
-  } else {
-    // Fallback: rank by fuel used from all distribution records
-    addSheet(wb, vehicleRanking(rows, 'Distribution'), '📊 Vehicle Rankings');
-  }
+  // Sheet 1: Overall vehicle rankings
+  addSheet(wb,
+    allClassified.length ? vehicleRanking(allClassified, 'All Routes')
+                         : [{ Note: 'No classified trips' }],
+    '📊 Overall Rankings'
+  );
 
-  // ── Sheet 2: Route rankings per direction ─────────────────────────────────────
+  // Sheet 2: Rankings by direction
   const dirRankings = [
     ...vehicleRanking(bucket.mbogaPortDirect,  'Mboga → Port (Direct)'),
     ...vehicleRanking(bucket.mbogaPortUbungo,  'Mboga → Port (via Ubungo)'),
     ...vehicleRanking(bucket.portVikindu,       'Port → Vikindu'),
     ...vehicleRanking(bucket.vikindPort,        'Vikindu → Port'),
   ];
-  addSheet(wb, dirRankings.length ? dirRankings : [{ Note: 'No classified trips yet' }], '📊 By Direction Rankings');
+  addSheet(wb, dirRankings.length ? dirRankings : [{ Note: 'No classified trips' }], '📊 By Direction Rankings');
 
-  // ── Sheet 3: All route trips combined ─────────────────────────────────────────
-  if (allClassified.length) {
-    const allTripRows = validTrips(allClassified)
-      .map((r) => tripRow(r, r._dir))
-      .sort((a, b) =>
-        (b['Departure Date'] || '').localeCompare(a['Departure Date'] || '')
-      );
-    addSheet(wb, allTripRows, '🗺 All Trips');
-  } else {
-    // Fallback: raw distribution records
-    const fallbackRows = rows.map((r) => ({
-      Date:             dateStr(r.date),
-      Vehicle:          r.plate,
-      Company:          r.company,
-      'Start Fuel (L)': r.startFuelL,
-      'End Fuel (L)':   r.endFuelL,
-      'Used Fuel (L)':  r.usedFuelL,
-      'Distance (km)':  r.distKm,
-      'km/L':           r.kmPerL,
-      'L/100km':        r.lPer100km,
-    })).sort((a, b) => (b['km/L'] ?? -1) - (a['km/L'] ?? -1));
-    addSheet(wb, fallbackRows, '📋 All Distribution Records');
-  }
+  // Sheet 3: All trips
+  const allTripRows = validTrips(allClassified)
+    .map((r) => tripRow(r, r._dir))
+    .sort((a, b) => (b['Departure Date'] || '').localeCompare(a['Departure Date'] || ''));
+  addSheet(wb, allTripRows.length ? allTripRows : [{ Note: 'No valid trips' }], '🗺 All Trips');
 
-  // ── Route-specific sheets ─────────────────────────────────────────────────────
-  addSheet(wb, sortedTrips(bucket.mbogaPortDirect,  'Mboga → Port (Direct)'),      '🚚 Mboga→Port Direct');
+  // Route-specific sheets
+  addSheet(wb, sortedTrips(bucket.mbogaPortDirect,  'Mboga → Port (Direct)'),     '🚚 Mboga→Port Direct');
   addSheet(wb, sortedTrips(bucket.mbogaPortUbungo,  'Mboga → Port (via Ubungo)'), '🚚 Mboga→Port Ubungo');
-  addSheet(wb, sortedTrips(bucket.portVikindu,       'Port → Vikindu'),             '⚓ Port→Vikindu');
-  addSheet(wb, sortedTrips(bucket.vikindPort,        'Vikindu → Port'),             '⚓ Vikindu→Port');
+  addSheet(wb, sortedTrips(bucket.portVikindu,       'Port → Vikindu'),            '⚓ Port→Vikindu');
+  addSheet(wb, sortedTrips(bucket.vikindPort,        'Vikindu → Port'),            '⚓ Vikindu→Port');
 
-  // ── Per-vehicle sheets (only if classified trips exist) ───────────────────────
+  // Per-vehicle sheets
   if (allClassified.length) {
     const validAll = validTrips(allClassified);
     const plates = [...new Set(validAll.map((r) => r.plate))].sort();
@@ -502,19 +509,14 @@ function addSheet(wb, data, sheetName) {
       const vRows = validAll
         .filter((r) => r.plate === plate)
         .map((r) => tripRow(r, r._dir))
-        .sort((a, b) =>
-          (b['Departure Date'] || '').localeCompare(a['Departure Date'] || '')
-        );
+        .sort((a, b) => (b['Departure Date'] || '').localeCompare(a['Departure Date'] || ''));
       if (vRows.length) addSheet(wb, vRows, `🚛 ${safeName(plate)}`);
     }
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────────
-  // Save next to the script so it's accessible in the repo folder
-  const outDir = path.join(__dirname, '..');
-  const outPath = path.join(outDir, 'Fleet_Routes_Analytics.xlsx');
+  const outPath = path.join(__dirname, '..', 'Fleet_Routes_Analytics.xlsx');
   XLSX.writeFile(wb, outPath);
-
   console.log(`\n✅ Excel saved: ${outPath}`);
   console.log(`   Sheets (${wb.SheetNames.length}): ${wb.SheetNames.join(', ')}`);
   process.exit(0);
