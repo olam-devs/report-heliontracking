@@ -61,13 +61,14 @@ const ROAD_KM = {
 const DRIVE_KM_THRESHOLD = 5;
 
 // ─── FUEL RATING THRESHOLDS (L/km) ───────────────────────────────────────────
-// Calibrated for heavy trucks on Dar urban/peri-urban routes
+// Allocation: Vikindu↔Port 0.30–0.45 L/km; below allocation = best performance
+// Lower L/km = better (driver used less fuel for the same distance)
 function fuelRating(lPerKm) {
   if (lPerKm == null) return '—';
-  if (lPerKm < 0.30)  return '✅ Excellent';
-  if (lPerKm < 0.40)  return '✅ Good';
-  if (lPerKm < 0.55)  return '⚠️ Slightly High';
-  return '🔴 Above Normal';
+  if (lPerKm < 0.30)  return '🏆 Below Budget — Best';   // under allocation: top performers
+  if (lPerKm < 0.45)  return '✅ Within Allocation';      // on target
+  if (lPerKm < 0.55)  return '⚠️ Slightly Over Budget';  // a bit high
+  return                      '🔴 Over Budget — Investigate'; // needs attention
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
