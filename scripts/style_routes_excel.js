@@ -79,13 +79,22 @@ function ratingStyle(ratingStr) {
   return dataCell(null, null, 'center');
 }
 
-function lkmStyle(val) {
+// Per-route allocation thresholds (matches generate_routes_analytics.js ROUTE_ALLOC)
+const ROUTE_ALLOC = {
+  'Mboga → Port (Direct)':     { max: 0.45, best: 0.30 },
+  'Mboga → Port (via Ubungo)': { max: 0.45, best: 0.30 },
+  'Port → Vikindu':            { max: 0.45, best: 0.35 },
+  'Vikindu → Port':            { max: 0.30, best: 0.25 },
+};
+
+function lkmStyle(val, direction) {
   const v = Number(val);
   if (!isFinite(v) || val == null) return dataCell(null, null, 'center');
-  if (v < 0.30) return dataCell('FFD4EDDA', C.greenTxt, 'center', true);  // below budget = best
-  if (v < 0.45) return dataCell(C.goodBg,   C.goodTxt,  'center');         // within allocation
-  if (v < 0.55) return dataCell(C.amberBg,  C.amberTxt, 'center');         // slightly over
-  return           dataCell(C.redBg,    C.redTxt,   'center', true);        // over budget
+  const alloc = ROUTE_ALLOC[direction] || { max: 0.45, best: 0.30 };
+  if (v < alloc.best)        return dataCell('FFD4EDDA', C.greenTxt, 'center', true); // below budget
+  if (v <= alloc.max)        return dataCell(C.goodBg,   C.goodTxt,  'center');        // within alloc
+  if (v <= alloc.max + 0.10) return dataCell(C.amberBg,  C.amberTxt, 'center');        // slightly over
+  return                            dataCell(C.redBg,    C.redTxt,   'center', true);  // over budget
 }
 
 const numFmt2 = '0.00';
@@ -130,11 +139,13 @@ function styleDataSheet(ws, rows, colDefs) {
                      medal === '🥈' ? 'FFF5F5F5' :
                      medal === '🥉' ? 'FFFFF0E0' : null;
 
+      const rowDir = row['Direction'] || null;
+
       let style;
       if (def?.type === 'rating') {
         style = ratingStyle(val);
       } else if (def?.type === 'lkm') {
-        style = goldBg ? dataCell(goldBg, null, 'center', true) : lkmStyle(val);
+        style = goldBg ? dataCell(goldBg, null, 'center', true) : lkmStyle(val, rowDir);
       } else if (def?.type === 'drive') {
         style = dataCell(goldBg || C.driveBg, null, 'center', !!goldBg);
       } else if (def?.type === 'idle') {

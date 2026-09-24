@@ -60,15 +60,26 @@ const ROAD_KM = {
 // GPS threshold: days with total track distance ≥ this are "driving days"
 const DRIVE_KM_THRESHOLD = 5;
 
-// ─── FUEL RATING THRESHOLDS (L/km) ───────────────────────────────────────────
-// Allocation: Vikindu↔Port 0.30–0.45 L/km; below allocation = best performance
-// Lower L/km = better (driver used less fuel for the same distance)
-function fuelRating(lPerKm) {
+// ─── FUEL RATING THRESHOLDS — per route (L/km) ───────────────────────────────
+// Company allocation:
+//   Vikindu → Port : max 0.30 L/km  (return, lighter load)
+//   Port → Vikindu : max 0.45 L/km  (outbound, heavier load)
+//   Mboga → Port   : range 0.30–0.45 L/km
+// Lower L/km = better (less fuel used for the same road distance)
+const ROUTE_ALLOC = {
+  'Mboga → Port (Direct)':     { max: 0.45, best: 0.30 },
+  'Mboga → Port (via Ubungo)': { max: 0.45, best: 0.30 },
+  'Port → Vikindu':            { max: 0.45, best: 0.35 },
+  'Vikindu → Port':            { max: 0.30, best: 0.25 },
+};
+
+function fuelRating(lPerKm, direction) {
   if (lPerKm == null) return '—';
-  if (lPerKm < 0.30)  return '🏆 Below Budget — Best';   // under allocation: top performers
-  if (lPerKm < 0.45)  return '✅ Within Allocation';      // on target
-  if (lPerKm < 0.55)  return '⚠️ Slightly Over Budget';  // a bit high
-  return                      '🔴 Over Budget — Investigate'; // needs attention
+  const alloc = ROUTE_ALLOC[direction] || { max: 0.45, best: 0.30 };
+  if (lPerKm < alloc.best)        return '🏆 Below Budget — Best';
+  if (lPerKm <= alloc.max)        return '✅ Within Allocation';
+  if (lPerKm <= alloc.max + 0.10) return '⚠️ Slightly Over Budget';
+  return                                  '🔴 Over Budget — Investigate';
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -458,7 +469,7 @@ function addSheet(wb, data, sheetName) {
       'Road Dist (km)':        roadKm,
       'L/km (total fuel)':     totalLkm,
       'L/km (driving fuel)':   drivingLkm,
-      'Rating':                fuelRating(drivingLkm ?? totalLkm),
+      'Rating':                fuelRating(drivingLkm ?? totalLkm, direction),
     };
   }
 
@@ -505,7 +516,7 @@ function addSheet(wb, data, sheetName) {
         'Avg L/km (total fuel)':   totalLkm,
         'Avg L/km (driving fuel)': drivingLkm,
         'Avg L/100km (driving)':   drivingLkm ? fmt2(drivingLkm * 100) : null,
-        'Rating':                  fuelRating(rankLkm),
+        'Rating':                  fuelRating(rankLkm, dir),
       };
     })
     .sort((a, b) => {
@@ -560,7 +571,7 @@ function addSheet(wb, data, sheetName) {
       'Avg L/km (total fuel)':   totalLkm,
       'Avg L/km (driving fuel)': drivingLkm,
       'Avg L/100km (driving)':   drivingLkm ? fmt2(drivingLkm * 100) : null,
-      'Rating':                  fuelRating(drivingLkm ?? totalLkm),
+      'Rating':                  fuelRating(drivingLkm ?? totalLkm, 'All Routes'),
     };
   })
   .sort((a, b) => {
