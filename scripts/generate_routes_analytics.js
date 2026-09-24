@@ -126,12 +126,9 @@ function addSheet(wb, data, sheetName) {
          vd.${endLatCol}/1000000   AS eLat, vd.${endLngCol}/1000000   AS eLng`
     : ', NULL AS sLat, NULL AS sLng, NULL AS eLat, NULL AS eLng';
 
-  // Distance from odometer diff (units are 0.1 km → ÷10 for km); guard against rollover
-  const distSelect = (sOdoCol && eOdoCol)
-    ? `, CASE WHEN vd.${eOdoCol} > vd.${sOdoCol}
-              THEN (CAST(vd.${eOdoCol} AS SIGNED) - CAST(vd.${sOdoCol} AS SIGNED)) / 10
-              ELSE NULL END AS distKm`
-    : ', NULL AS distKm';
+  // Distance columns removed — CMSV6 odometer factory-defaulted to 0 on most vehicles;
+  // the delta reflects lifetime accumulated km, not per-trip distance. Not useful here.
+  const distSelect = ', NULL AS distKm'; // kept in query shape for compatibility, not output
 
   const [rows] = await conn.query(`
     SELECT
@@ -235,14 +232,13 @@ function addSheet(wb, data, sheetName) {
     return [];
   }
 
-  // ── 5. Normalise fuel/distance on all rows ────────────────────────────────────
+  // ── 5. Normalise fuel on all rows (distance dropped — odometer unreliable) ─────
   for (const r of rows) {
     r.usedFuelL  = fmt2(r.usedFuelL);
     r.startFuelL = fmt2(r.startFuelL);
     r.endFuelL   = fmt2(r.endFuelL);
-    r.distKm     = r.distKm ? fmt2(r.distKm) : null;
-    r.kmPerL     = r.distKm && r.usedFuelL > 0 ? fmt2(r.distKm / r.usedFuelL) : null;
-    r.lPer100km  = r.distKm && r.usedFuelL > 0 ? fmt2(r.usedFuelL / r.distKm * 100) : null;
+    // distKm, kmPerL, lPer100km removed: CMSV6 odometer default=0 on most vehicles
+    // so ELiCheng-SLiCheng reflects lifetime accumulated km, not trip distance.
   }
 
   // ── 6. Classify trips via GPS blob ───────────────────────────────────────────
@@ -292,6 +288,12 @@ function addSheet(wb, data, sheetName) {
     // WINDOW: if vehicle at waypoint A on day N, look up to 3 days later for waypoint B
     const WINDOW_DAYS = 3;
 
+    // Track classified trips to prevent duplicates and double-classification
+    // Key: vehiID|departureDate  →  once a departure day fires a route, skip it
+    // Key: vehiID|departureDate|arrivalDate|dir  →  dedup identical trips
+    const usedDepartures = new Set();
+    const seenTrips = new Set();
+
     for (const [, vDays] of Object.entries(dayInfo)) {
       const sortedDates = Object.keys(vDays).sort();
 
@@ -299,6 +301,9 @@ function addSheet(wb, data, sheetName) {
         const dsA = sortedDates[i];
         const infoA = vDays[dsA];
         if (!infoA.hitM && !infoA.hitP && !infoA.hitV) continue; // not near any waypoint
+
+        const depKey = `${infoA.r.vehiID}|${dsA}`;
+        if (usedDepartures.has(depKey)) continue; // already classified from this departure day
 
         // Look ahead within window
         for (let j = i; j < sortedDates.length; j++) {
@@ -317,31 +322,50 @@ function addSheet(wb, data, sheetName) {
           const toV   = infoB.hitV;
           const toU   = infoB.hitU;
 
-          // Mboga → Port
+          let classified = false;
+
+          // Mboga → Port (takes priority over V→P when vehicle also touched Vikindu)
           if (fromM && toP && !infoB.hitV) {
-            const r = infoB.r;
+            const r = { ...infoB.r };
             r._arrivalDate = dsB;
             r._departureDate = dsA;
             r._viaUbungo = toU || infoA.hitU;
-            if (r._viaUbungo) bucket.mbogaPortUbungo.push(r);
-            else               bucket.mbogaPortDirect.push(r);
-            break; // only classify once per departure day
+            const dir = r._viaUbungo ? 'mbogaPortUbungo' : 'mbogaPortDirect';
+            const tripKey = `${r.vehiID}|${dsA}|${dsB}|${dir}`;
+            if (!seenTrips.has(tripKey)) {
+              seenTrips.add(tripKey);
+              bucket[dir].push(r);
+            }
+            classified = true;
           }
           // Port → Vikindu
-          if (fromP && toV && !infoB.hitM) {
-            const r = infoB.r;
+          else if (fromP && toV && !infoB.hitM) {
+            const r = { ...infoB.r };
             r._arrivalDate = dsB;
             r._departureDate = dsA;
-            bucket.portVikindu.push(r);
-            break;
+            const tripKey = `${r.vehiID}|${dsA}|${dsB}|portVikindu`;
+            if (!seenTrips.has(tripKey)) {
+              seenTrips.add(tripKey);
+              bucket.portVikindu.push(r);
+            }
+            classified = true;
           }
           // Vikindu → Port
-          if (fromV && toP && !infoB.hitM) {
-            const r = infoB.r;
+          else if (fromV && toP && !infoB.hitM) {
+            const r = { ...infoB.r };
             r._arrivalDate = dsB;
             r._departureDate = dsA;
-            bucket.vikindPort.push(r);
-            break;
+            const tripKey = `${r.vehiID}|${dsA}|${dsB}|vikindPort`;
+            if (!seenTrips.has(tripKey)) {
+              seenTrips.add(tripKey);
+              bucket.vikindPort.push(r);
+            }
+            classified = true;
+          }
+
+          if (classified) {
+            usedDepartures.add(depKey);
+            break; // only classify once per departure day
           }
         }
       }
@@ -364,6 +388,11 @@ function addSheet(wb, data, sheetName) {
   }
 
   // ── 8. Build row mapper ───────────────────────────────────────────────────────
+  // Filter out trips with 0 or null fuel used — sensor dead days, not real trips
+  function validTrips(arr) {
+    return arr.filter((r) => r.usedFuelL != null && r.usedFuelL >= 1);
+  }
+
   function tripRow(r, direction) {
     return {
       'Departure Date':  r._departureDate || dateStr(r.date),
@@ -375,30 +404,25 @@ function addSheet(wb, data, sheetName) {
       'Start Fuel (L)':  r.startFuelL,
       'End Fuel (L)':    r.endFuelL,
       'Used Fuel (L)':   r.usedFuelL,
-      'Distance (km)':   r.distKm,
-      'km/L':            r.kmPerL,
-      'L/100km':         r.lPer100km,
+      // Distance and efficiency removed: odometer factory-defaulted to 0 on most vehicles;
+      // ELiCheng−SLiCheng reflects lifetime accumulated km, not single-trip distance.
     };
   }
 
   function sortedTrips(arr, dir) {
-    return arr
+    return validTrips(arr)
       .map((r) => tripRow(r, dir))
-      .sort((a, b) => {
-        // Best km/L first; if null, push to bottom
-        const ka = a['km/L'] ?? -1, kb = b['km/L'] ?? -1;
-        if (kb !== ka) return kb - ka;
-        return (b['Departure Date'] || '').localeCompare(a['Departure Date'] || '');
-      });
+      .sort((a, b) =>
+        (b['Departure Date'] || '').localeCompare(a['Departure Date'] || '')
+      );
   }
 
   function vehicleRanking(arr, dir) {
     const byV = {};
-    for (const r of arr) {
-      if (!byV[r.plate]) byV[r.plate] = { trips: 0, fuel: 0, km: 0, company: r.company };
+    for (const r of validTrips(arr)) {
+      if (!byV[r.plate]) byV[r.plate] = { trips: 0, fuel: 0, company: r.company };
       byV[r.plate].trips++;
       byV[r.plate].fuel += r.usedFuelL || 0;
-      byV[r.plate].km   += r.distKm   || 0;
     }
     return Object.entries(byV).map(([plate, v]) => ({
       Rank:                   0,
@@ -407,11 +431,9 @@ function addSheet(wb, data, sheetName) {
       Direction:              dir,
       Trips:                  v.trips,
       'Total Fuel Used (L)':  fmt2(v.fuel),
-      'Total Distance (km)':  v.km > 0 ? fmt2(v.km) : '—',
-      'Avg km/L':             v.km > 0 && v.fuel > 0 ? fmt2(v.km / v.fuel) : null,
-      'Avg L/100km':          v.km > 0 && v.fuel > 0 ? fmt2(v.fuel / v.km * 100) : null,
+      'Avg Fuel / Trip (L)':  v.trips > 0 ? fmt2(v.fuel / v.trips) : null,
     }))
-    .sort((a, b) => (b['Avg km/L'] ?? -1) - (a['Avg km/L'] ?? -1))
+    .sort((a, b) => (b['Total Fuel Used (L)'] ?? 0) - (a['Total Fuel Used (L)'] ?? 0))
     .map((r, i) => ({ ...r, Rank: i + 1 }));
   }
 
@@ -444,9 +466,11 @@ function addSheet(wb, data, sheetName) {
 
   // ── Sheet 3: All route trips combined ─────────────────────────────────────────
   if (allClassified.length) {
-    const allTripRows = allClassified
+    const allTripRows = validTrips(allClassified)
       .map((r) => tripRow(r, r._dir))
-      .sort((a, b) => (b['km/L'] ?? -1) - (a['km/L'] ?? -1));
+      .sort((a, b) =>
+        (b['Departure Date'] || '').localeCompare(a['Departure Date'] || '')
+      );
     addSheet(wb, allTripRows, '🗺 All Trips');
   } else {
     // Fallback: raw distribution records
@@ -472,12 +496,15 @@ function addSheet(wb, data, sheetName) {
 
   // ── Per-vehicle sheets (only if classified trips exist) ───────────────────────
   if (allClassified.length) {
-    const plates = [...new Set(allClassified.map((r) => r.plate))].sort();
+    const validAll = validTrips(allClassified);
+    const plates = [...new Set(validAll.map((r) => r.plate))].sort();
     for (const plate of plates.slice(0, 25)) {
-      const vRows = allClassified
+      const vRows = validAll
         .filter((r) => r.plate === plate)
         .map((r) => tripRow(r, r._dir))
-        .sort((a, b) => (b['km/L'] ?? -1) - (a['km/L'] ?? -1));
+        .sort((a, b) =>
+          (b['Departure Date'] || '').localeCompare(a['Departure Date'] || '')
+        );
       if (vRows.length) addSheet(wb, vRows, `🚛 ${safeName(plate)}`);
     }
   }
