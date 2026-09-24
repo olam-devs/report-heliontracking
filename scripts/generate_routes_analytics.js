@@ -10,12 +10,16 @@
  * Fuel methodology (matches Dar↔Mboga analysis):
  *   Used = StartFuel(depDay) + Refueled(all days in window) − EndFuel(arrDay)
  *
- * Distance methodology:
- *   Sum of haversine segments from GPS blobs across all days in trip window.
- *   Jumps > 5 km between consecutive points are skipped (GPS dropout).
+ * Driving vs Idle split:
+ *   Each day in the trip window is classified by GPS track distance:
+ *     ≥ 5 km → Driving day    (vehicle physically moved on the road)
+ *     < 5 km → Idle day       (vehicle stationary: loading, waiting at port, etc.)
+ *   Driving fuel = total_fuel × (driving_gps_km / total_gps_km)   [proportional estimate]
+ *   Idle fuel    = total_fuel − driving_fuel
+ *   L/km         = driving_fuel / fixed_road_km   (clean efficiency metric)
  *
  * Run on VPS:
- *   cd /root && node scripts/generate_routes_analytics.js
+ *   cd C:\helion\_repo\fleet-incident-reporter && node scripts/generate_routes_analytics.js
  *
  * Requires: mysql2, xlsx  (npm install mysql2 xlsx  if not present)
  * Output:   Fleet_Routes_Analytics.xlsx  (repo root, next to scripts/)
@@ -44,6 +48,17 @@ const WP = {
   VIKINDU: { lat: -7.0144, lng: 39.3073, radiusKm: 1.5, label: 'Vikindu' },
   UBUNGO:  { lat: -6.7925, lng: 39.2094, radiusKm: 1.2, label: 'Ubungo' },
 };
+
+// ─── KNOWN ROAD DISTANCES (km) ───────────────────────────────────────────────
+const ROAD_KM = {
+  'Mboga → Port (Direct)':     18,
+  'Mboga → Port (via Ubungo)': 18,
+  'Port → Vikindu':            28,
+  'Vikindu → Port':            28,
+};
+
+// GPS threshold: days with total track distance ≥ this are "driving days"
+const DRIVE_KM_THRESHOLD = 5;
 
 // ─── FUEL RATING THRESHOLDS (L/km) ───────────────────────────────────────────
 // Calibrated for heavy trucks on Dar urban/peri-urban routes
@@ -233,9 +248,9 @@ function addSheet(wb, data, sheetName) {
     return pts;
   }
 
-  // ── 4. Compute trip fuel and GPS distance across the full window ───────────────
+  // ── 4. Compute trip fuel + driving/idle split across the full window ──────────
   // Formula: used = startFuel(depDay) + Σrefueled(all days in window) − endFuel(arrDay)
-  // GPS distance: sum haversine segments from blobs for every day in window
+  // Driving split: classify each day by GPS distance; split fuel proportionally.
   function getTripMetrics(vehiID, dsA, dsB) {
     const vDays = dailyByVehicle[vehiID] || {};
     const depDay = vDays[dsA];
@@ -256,26 +271,40 @@ function addSheet(wb, data, sheetName) {
 
     const usedFuel = fmt2(startFuel + refueled - endFuel);
 
-    // GPS distance: sum cached blobs across window
-    let distKm = 0;
-    for (const ds of dateRange(dsA, dsB)) {
-      const pts = ptsCache[`${vehiID}_${ds}`] || [];
-      distKm += trackDistanceKm(pts);
-    }
-    distKm = fmt2(distKm);
+    // Classify each day as driving (GPS ≥ DRIVE_KM_THRESHOLD) or idle
+    let totalGpsKm = 0, drivingKm = 0;
+    let drivingDays = 0, idleDays = 0;
 
-    const lPerKm = (distKm > 0 && usedFuel != null && usedFuel > 0)
-      ? fmt3(usedFuel / distKm)
-      : null;
+    for (const ds of dateRange(dsA, dsB)) {
+      const pts   = ptsCache[`${vehiID}_${ds}`] || [];
+      const dayKm = trackDistanceKm(pts);
+      totalGpsKm += dayKm;
+      if (dayKm >= DRIVE_KM_THRESHOLD) {
+        drivingKm += dayKm;
+        drivingDays++;
+      } else {
+        idleDays++;
+      }
+    }
+
+    // Proportional fuel split: driving fuel ∝ driving GPS km / total GPS km
+    let drivingFuel = null, idleFuel = null;
+    if (totalGpsKm > 0.1 && usedFuel != null && usedFuel > 0) {
+      drivingFuel = fmt2(usedFuel * (drivingKm / totalGpsKm));
+      idleFuel    = fmt2(usedFuel - drivingFuel);
+    }
 
     return {
-      startFuel:  fmt2(startFuel),
-      refueled:   fmt2(refueled),
-      endFuel:    fmt2(endFuel),
-      usedFuel:   (usedFuel != null && usedFuel > 0) ? usedFuel : null,
-      distKm:     distKm > 0 ? distKm : null,
-      lPerKm,
-      rating:     fuelRating(lPerKm),
+      startFuel:   fmt2(startFuel),
+      refueled:    fmt2(refueled),
+      endFuel:     fmt2(endFuel),
+      usedFuel:    (usedFuel != null && usedFuel > 0) ? usedFuel : null,
+      drivingDays,
+      idleDays,
+      drivingKm:   drivingKm > 0 ? fmt2(drivingKm) : null,
+      totalGpsKm:  totalGpsKm > 0 ? fmt2(totalGpsKm) : null,
+      drivingFuel,
+      idleFuel,
     };
   }
 
@@ -405,20 +434,30 @@ function addSheet(wb, data, sheetName) {
 
   function tripRow(r, direction) {
     const m = r._metrics || {};
+    const roadKm     = ROAD_KM[direction] || null;
+    const totalLkm   = (roadKm && m.usedFuel   > 0) ? fmt3(m.usedFuel   / roadKm) : null;
+    const drivingLkm = (roadKm && m.drivingFuel > 0) ? fmt3(m.drivingFuel / roadKm) : null;
     return {
-      'Departure Date': r._departureDate,
-      'Arrival Date':   r._arrivalDate,
-      Direction:        direction,
-      'Via Ubungo':     r._viaUbungo ? 'YES' : (direction.includes('Mboga') ? 'NO' : '—'),
-      Vehicle:          r.plate,
-      Company:          r.company,
-      'Start Fuel (L)': m.startFuel   ?? null,
-      'Refueled (L)':   m.refueled    ?? 0,
-      'End Fuel (L)':   m.endFuel     ?? null,
-      'Used Fuel (L)':  m.usedFuel    ?? null,
-      'Distance (km)':  m.distKm      ?? null,
-      'L/km':           m.lPerKm      ?? null,
-      'Rating':         m.rating      ?? '—',
+      'Departure Date':        r._departureDate,
+      'Arrival Date':          r._arrivalDate,
+      Direction:               direction,
+      'Via Ubungo':            r._viaUbungo ? 'YES' : (direction.includes('Mboga') ? 'NO' : '—'),
+      Vehicle:                 r.plate,
+      Company:                 r.company,
+      'Start Fuel (L)':        m.startFuel    ?? null,
+      'Refueled (L)':          m.refueled     ?? 0,
+      'End Fuel (L)':          m.endFuel      ?? null,
+      'Total Fuel (L)':        m.usedFuel     ?? null,
+      'Driving Days':          m.drivingDays  ?? null,
+      'Idle Days':             m.idleDays     ?? null,
+      'Driving GPS (km)':      m.drivingKm    ?? null,
+      'Total GPS (km)':        m.totalGpsKm   ?? null,
+      'Driving Fuel Est (L)':  m.drivingFuel  ?? null,
+      'Idle Fuel Est (L)':     m.idleFuel     ?? null,
+      'Road Dist (km)':        roadKm,
+      'L/km (total fuel)':     totalLkm,
+      'L/km (driving fuel)':   drivingLkm,
+      'Rating':                fuelRating(drivingLkm ?? totalLkm),
     };
   }
 
@@ -432,32 +471,45 @@ function addSheet(wb, data, sheetName) {
 
   function vehicleRanking(arr, dir) {
     const byV = {};
+    const roadKm = ROAD_KM[dir] || null;
     for (const r of validTrips(arr)) {
       const m = r._metrics || {};
-      if (!byV[r.plate]) byV[r.plate] = { trips: 0, fuel: 0, dist: 0, company: r.company };
+      if (!byV[r.plate]) byV[r.plate] = {
+        trips: 0, totalFuel: 0, drivingFuel: 0, drivingDays: 0, idleDays: 0, company: r.company,
+      };
       byV[r.plate].trips++;
-      byV[r.plate].fuel += m.usedFuel || 0;
-      byV[r.plate].dist += m.distKm   || 0;
+      byV[r.plate].totalFuel   += m.usedFuel    || 0;
+      byV[r.plate].drivingFuel += m.drivingFuel || 0;
+      byV[r.plate].drivingDays += m.drivingDays || 0;
+      byV[r.plate].idleDays    += m.idleDays    || 0;
     }
     return Object.entries(byV).map(([plate, v]) => {
-      const avgLPerKm = (v.dist > 0 && v.fuel > 0) ? fmt3(v.fuel / v.dist) : null;
+      const totalDist  = roadKm ? roadKm * v.trips : null;
+      const totalLkm   = (totalDist  && v.totalFuel   > 0) ? fmt3(v.totalFuel   / totalDist)  : null;
+      const drivingLkm = (totalDist  && v.drivingFuel > 0) ? fmt3(v.drivingFuel / totalDist)  : null;
+      const rankLkm    = drivingLkm ?? totalLkm;
       return {
-        Rank:                    0,
-        Vehicle:                 plate,
-        Company:                 v.company,
-        Direction:               dir,
-        Trips:                   v.trips,
-        'Total Fuel Used (L)':   fmt2(v.fuel),
-        'Total Distance (km)':   v.dist > 0 ? fmt2(v.dist) : null,
-        'Avg Fuel / Trip (L)':   v.trips > 0 ? fmt2(v.fuel / v.trips) : null,
-        'Avg L/km':              avgLPerKm,
-        'Avg L/100km':           avgLPerKm ? fmt2(avgLPerKm * 100) : null,
-        'Rating':                fuelRating(avgLPerKm),
+        Rank:                      0,
+        Vehicle:                   plate,
+        Company:                   v.company,
+        Direction:                 dir,
+        Trips:                     v.trips,
+        'Total Fuel Used (L)':     fmt2(v.totalFuel),
+        'Driving Fuel Est (L)':    v.drivingFuel > 0 ? fmt2(v.drivingFuel) : null,
+        'Idle Fuel Est (L)':       v.drivingFuel > 0 ? fmt2(v.totalFuel - v.drivingFuel) : null,
+        'Avg Driving Days/Trip':   v.trips > 0 ? fmt2(v.drivingDays / v.trips) : null,
+        'Avg Idle Days/Trip':      v.trips > 0 ? fmt2(v.idleDays / v.trips) : null,
+        'Avg Fuel/Trip (L)':       v.trips > 0 ? fmt2(v.totalFuel / v.trips) : null,
+        'Road Dist/Trip (km)':     roadKm,
+        'Avg L/km (total fuel)':   totalLkm,
+        'Avg L/km (driving fuel)': drivingLkm,
+        'Avg L/100km (driving)':   drivingLkm ? fmt2(drivingLkm * 100) : null,
+        'Rating':                  fuelRating(rankLkm),
       };
     })
     .sort((a, b) => {
-      // Sort: valid L/km ascending (best first), nulls last
-      const ka = a['Avg L/km'] ?? 999, kb = b['Avg L/km'] ?? 999;
+      const ka = a['Avg L/km (driving fuel)'] ?? a['Avg L/km (total fuel)'] ?? 999;
+      const kb = b['Avg L/km (driving fuel)'] ?? b['Avg L/km (total fuel)'] ?? 999;
       return ka - kb;
     })
     .map((r, i) => ({ ...r, Rank: i + 1 }));
@@ -473,10 +525,52 @@ function addSheet(wb, data, sheetName) {
     ...bucket.vikindPort.map((r)      => ({ ...r, _dir: 'Vikindu → Port' })),
   ];
 
-  // Sheet 1: Overall vehicle rankings
+  // Sheet 1: Overall vehicle rankings (all routes combined; road km not meaningful across routes)
+  // Use per-route rankings instead for meaningful L/km
+  const overallByV = {};
+  for (const r of validTrips(allClassified)) {
+    const m = r._metrics || {};
+    const roadKm = ROAD_KM[r._dir] || 0;
+    if (!overallByV[r.plate]) overallByV[r.plate] = {
+      trips: 0, totalFuel: 0, drivingFuel: 0, roadKmTotal: 0,
+      drivingDays: 0, idleDays: 0, company: r.company,
+    };
+    overallByV[r.plate].trips++;
+    overallByV[r.plate].totalFuel   += m.usedFuel    || 0;
+    overallByV[r.plate].drivingFuel += m.drivingFuel || 0;
+    overallByV[r.plate].roadKmTotal += roadKm;
+    overallByV[r.plate].drivingDays += m.drivingDays || 0;
+    overallByV[r.plate].idleDays    += m.idleDays    || 0;
+  }
+  const overallRows = Object.entries(overallByV).map(([plate, v]) => {
+    const totalLkm   = (v.roadKmTotal > 0 && v.totalFuel   > 0) ? fmt3(v.totalFuel   / v.roadKmTotal) : null;
+    const drivingLkm = (v.roadKmTotal > 0 && v.drivingFuel > 0) ? fmt3(v.drivingFuel / v.roadKmTotal) : null;
+    return {
+      Rank:                      0,
+      Vehicle:                   plate,
+      Company:                   v.company,
+      Trips:                     v.trips,
+      'Total Fuel (L)':          fmt2(v.totalFuel),
+      'Driving Fuel Est (L)':    v.drivingFuel > 0 ? fmt2(v.drivingFuel) : null,
+      'Idle Fuel Est (L)':       v.drivingFuel > 0 ? fmt2(v.totalFuel - v.drivingFuel) : null,
+      'Avg Driving Days/Trip':   v.trips > 0 ? fmt2(v.drivingDays / v.trips) : null,
+      'Avg Idle Days/Trip':      v.trips > 0 ? fmt2(v.idleDays    / v.trips) : null,
+      'Avg Fuel/Trip (L)':       v.trips > 0 ? fmt2(v.totalFuel   / v.trips) : null,
+      'Avg L/km (total fuel)':   totalLkm,
+      'Avg L/km (driving fuel)': drivingLkm,
+      'Avg L/100km (driving)':   drivingLkm ? fmt2(drivingLkm * 100) : null,
+      'Rating':                  fuelRating(drivingLkm ?? totalLkm),
+    };
+  })
+  .sort((a, b) => {
+    const ka = a['Avg L/km (driving fuel)'] ?? a['Avg L/km (total fuel)'] ?? 999;
+    const kb = b['Avg L/km (driving fuel)'] ?? b['Avg L/km (total fuel)'] ?? 999;
+    return ka - kb;
+  })
+  .map((r, i) => ({ ...r, Rank: i + 1 }));
+
   addSheet(wb,
-    allClassified.length ? vehicleRanking(allClassified, 'All Routes')
-                         : [{ Note: 'No classified trips' }],
+    overallRows.length ? overallRows : [{ Note: 'No classified trips' }],
     '📊 Overall Rankings'
   );
 
