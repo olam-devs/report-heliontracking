@@ -483,7 +483,8 @@ function addSheet(wb, data, sheetName) {
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────────
-  const outDir = process.env.HOME || os.homedir();
+  // Save next to the script so it's accessible in the repo folder
+  const outDir = path.join(__dirname, '..');
   const outPath = path.join(outDir, 'Fleet_Routes_Analytics.xlsx');
   XLSX.writeFile(wb, outPath);
 
