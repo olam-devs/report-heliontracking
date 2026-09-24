@@ -163,10 +163,12 @@ function addSheet(wb, data, sheetName) {
   // ── 4. Set up GPS track table lookup ─────────────────────────────────────────
   // Tables: jt808_vehicle_gps_N_YYYYMM (N=1..4, monthly partitions)
   // Each row: VehiID, DevIDNO, GPSDate, GPSData (mediumblob)
-  // GPSData binary format (confirmed by probe_hex_offsets.js 2026-09-24):
-  //   72-byte records; within each record:
-  //     - offset 40: longitude  (signed LE int32, ÷1e6 = degrees East)
-  //     - offset 44: latitude   (signed LE int32, ÷1e6 = degrees, negative = South)
+  // GPSData binary format:
+  //   - Bytes 0-35: header (skip)
+  //   - Bytes 36, 72, 108 ... : GPS records, each 36 bytes
+  //   Within each 36-byte GPS record:
+  //     - offset 3: longitude  (signed LE int32, ÷1e6 = degrees East)
+  //     - offset 7: latitude   (signed LE int32, ÷1e6 = degrees, negative = South)
 
   const allTrackTableNames = new Set(trackTbls.map((t) => t.TABLE_NAME));
   const trackBaseMatch = trackTbls[0]?.TABLE_NAME.match(/^(.+?)_\d+_\d{6}$/);
@@ -175,13 +177,13 @@ function addSheet(wb, data, sheetName) {
 
   function parseGPSBlob(buf) {
     if (!Buffer.isBuffer(buf) || buf.length < 72) return [];
-    // 72-byte records confirmed by probe_hex_offsets.js:
-    //   lng at record+40 (LE int32 ÷1e6), lat at record+44
+    // Each 72-byte record: [36-byte metadata][36-byte GPS data]
+    // GPS half: lng at offset 2 (bytes 38-41), lat at offset 6 (bytes 42-45) from record start
     const RECORD = 72;
     const pts = [];
     for (let off = 0; off + RECORD <= buf.length; off += RECORD) {
-      const lng = buf.readInt32LE(off + 40) / 1e6;
-      const lat = buf.readInt32LE(off + 44) / 1e6;
+      const lng = buf.readInt32LE(off + 38) / 1e6;
+      const lat = buf.readInt32LE(off + 42) / 1e6;
       if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180 &&
           (Math.abs(lat) > 0.01 || Math.abs(lng) > 0.01)) pts.push({ lat, lng });
     }
