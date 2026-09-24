@@ -388,7 +388,7 @@ function addSheet(wb, data, sheetName) {
         // Best km/L first; if null, push to bottom
         const ka = a['km/L'] ?? -1, kb = b['km/L'] ?? -1;
         if (kb !== ka) return kb - ka;
-        return b.Date.localeCompare(a.Date);
+        return (b['Departure Date'] || '').localeCompare(a['Departure Date'] || '');
       });
   }
 
