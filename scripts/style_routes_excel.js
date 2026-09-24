@@ -72,27 +72,41 @@ function thinBorder() {
 
 function ratingStyle(ratingStr) {
   const r = String(ratingStr || '');
-  if (r.includes('Below Budget') || r.includes('Excellent')) return dataCell('FFD4EDDA', C.greenTxt, 'center', true);
-  if (r.includes('Within') || r.includes('Good'))            return dataCell(C.goodBg,   C.goodTxt,  'center', true);
+  if (r.includes('Too Low'))                                  return dataCell('FFFFF0D0', 'FF8B6914', 'center');       // bad data — amber/gold
+  if (r.includes('Below Budget') || r.includes('Excellent')) return dataCell('FFD4EDDA', C.greenTxt, 'center', true); // best — green
+  if (r.includes('Within') || r.includes('Good'))            return dataCell(C.goodBg,   C.goodTxt,  'center', true); // on target
   if (r.includes('Slightly'))  return dataCell(C.amberBg, C.amberTxt, 'center');
   if (r.includes('Over Budget') || r.includes('Above') || r.includes('🔴')) return dataCell(C.redBg, C.redTxt, 'center', true);
   return dataCell(null, null, 'center');
 }
 
-// Per-route allocation thresholds (matches generate_routes_analytics.js ROUTE_ALLOC)
+// Per-route allocation thresholds
 const ROUTE_ALLOC = {
-  'Mboga → Port (Direct)':     { max: 0.45, best: 0.30 },
-  'Mboga → Port (via Ubungo)': { max: 0.45, best: 0.30 },
-  'Port → Vikindu':            { max: 0.45, best: 0.35 },
-  'Vikindu → Port':            { max: 0.30, best: 0.25 },
+  'Mboga → Port (Direct)':     { min: 0.20, max: 0.45, best: 0.30 },
+  'Mboga → Port (via Ubungo)': { min: 0.20, max: 0.45, best: 0.30 },
+  'Port → Vikindu':            { min: 0.20, max: 0.45, best: 0.35 },
+  'Vikindu → Port':            { min: 0.20, max: 0.30, best: 0.25 },
 };
+
+// Recompute correct rating from L/km + direction (overrides whatever the source file says)
+function computeRating(lkm, direction) {
+  const v = Number(lkm);
+  if (!isFinite(v) || lkm == null) return '—';
+  const a = ROUTE_ALLOC[direction] || { min: 0.20, max: 0.45, best: 0.30 };
+  if (v < a.min)        return '⚠️ Too Low — Check Data';
+  if (v < a.best)       return '🏆 Below Budget — Best';
+  if (v <= a.max)       return '✅ Within Allocation';
+  if (v <= a.max + 0.10) return '⚠️ Slightly Over Budget';
+  return                        '🔴 Over Budget — Investigate';
+}
 
 function lkmStyle(val, direction) {
   const v = Number(val);
   if (!isFinite(v) || val == null) return dataCell(null, null, 'center');
-  const alloc = ROUTE_ALLOC[direction] || { max: 0.45, best: 0.30 };
-  if (v < alloc.best)        return dataCell('FFD4EDDA', C.greenTxt, 'center', true); // below budget
-  if (v <= alloc.max)        return dataCell(C.goodBg,   C.goodTxt,  'center');        // within alloc
+  const alloc = ROUTE_ALLOC[direction] || { min: 0.20, max: 0.45, best: 0.30 };
+  if (v < alloc.min)         return dataCell('FFFFF0D0', 'FF8B6914', 'center');        // too low — bad data
+  if (v < alloc.best)        return dataCell('FFD4EDDA', C.greenTxt, 'center', true); // below budget — best
+  if (v <= alloc.max)        return dataCell(C.goodBg,   C.goodTxt,  'center');        // within allocation
   if (v <= alloc.max + 0.10) return dataCell(C.amberBg,  C.amberTxt, 'center');        // slightly over
   return                            dataCell(C.redBg,    C.redTxt,   'center', true);  // over budget
 }
@@ -126,6 +140,12 @@ function styleDataSheet(ws, rows, colDefs) {
 
     const rowValues = colDefs.map((c) => {
       if (c.key === 'Rank' && medal) return `${medal} ${row[c.key] ?? ''}`;
+      // Always recompute Rating from L/km + Direction so source errors don't carry over
+      if (c.key === 'Rating') {
+        const lkm = row['L/km (drive fuel)'] ?? row['L/km (total fuel)']
+                 ?? row['Avg L/km (drive fuel)'] ?? row['Avg L/km (total fuel)'];
+        return computeRating(lkm, row['Direction']);
+      }
       return row[c.key] ?? null;
     });
     const dr = ws.addRow(rowValues);
@@ -193,14 +213,16 @@ const TRIP_COLS = [
   { key: 'Total Fuel (L)',       header: 'Total\nFuel (L)',   width: 12, type: 'fuel',   numFmt: numFmt2, headerBg: C.steelBg },
   { key: 'Driving Days',         header: 'Driving\nDays',    width: 11, type: 'drive',  align: 'center' },
   { key: 'Idle Days',            header: 'Idle\nDays',       width: 10, type: 'idle',   align: 'center' },
-  { key: 'Driving GPS (km)',     header: 'Drive\nGPS km',    width: 11, type: 'drive',  numFmt: numFmt2 },
-  { key: 'Total GPS (km)',       header: 'Total\nGPS km',    width: 11, numFmt: numFmt2 },
-  { key: 'Driving Fuel Est (L)', header: 'Drive\nFuel (L)',  width: 12, type: 'drive',  numFmt: numFmt2 },
-  { key: 'Idle Fuel Est (L)',    header: 'Idle\nFuel (L)',   width: 12, type: 'idle',   numFmt: numFmt2 },
-  { key: 'Road Dist (km)',       header: 'Road\nDist (km)',  width: 11, numFmt: numFmt2 },
-  { key: 'L/km (total fuel)',    header: 'L/km\n(total)',    width: 12, type: 'lkm',    numFmt: numFmt3 },
-  { key: 'L/km (driving fuel)',  header: 'L/km\n(driving)',  width: 13, type: 'lkm',    numFmt: numFmt3, headerBg: C.tealBg },
-  { key: 'Rating',               header: 'Rating',           width: 24, type: 'rating'  },
+  { key: 'Drive Fuel (L)',       header: 'Drive\nFuel (L)',   width: 12, type: 'drive',  numFmt: numFmt2 },
+  { key: 'Idle Fuel (L)',        header: 'Idle\nFuel (L)',    width: 12, type: 'idle',   numFmt: numFmt2 },
+  { key: 'Drive Time (hrs)',     header: 'Drive\nTime (h)',   width: 11, type: 'drive',  numFmt: numFmt2 },
+  { key: 'Idle Time (hrs)',      header: 'Idle\nTime (h)',    width: 11, type: 'idle',   numFmt: numFmt2 },
+  { key: 'Odometer (km)',        header: 'Odom\n(km)',        width: 11, numFmt: numFmt2 },
+  { key: 'Road Dist (km)',       header: 'Road\nDist (km)',   width: 11, numFmt: numFmt2 },
+  { key: 'Dist Used',            header: 'Dist\nSource',      width: 13, align: 'center' },
+  { key: 'L/km (total fuel)',    header: 'L/km\n(total)',     width: 12, type: 'lkm',    numFmt: numFmt3 },
+  { key: 'L/km (drive fuel)',    header: 'L/km\n(drive)',     width: 12, type: 'lkm',    numFmt: numFmt3, headerBg: C.tealBg },
+  { key: 'Rating',               header: 'Rating',            width: 26, type: 'rating'  },
 ];
 
 const RANK_COLS = [
@@ -210,15 +232,16 @@ const RANK_COLS = [
   { key: 'Direction',                  header: 'Direction',             width: 26,  align: 'left'   },
   { key: 'Trips',                      header: 'Trips',                 width:  8,  align: 'center' },
   { key: 'Total Fuel Used (L)',        header: 'Total\nFuel (L)',       width: 12,  type: 'fuel',   numFmt: numFmt2 },
-  { key: 'Driving Fuel Est (L)',       header: 'Drive\nFuel (L)',       width: 12,  type: 'drive',  numFmt: numFmt2 },
-  { key: 'Idle Fuel Est (L)',          header: 'Idle\nFuel (L)',        width: 12,  type: 'idle',   numFmt: numFmt2 },
+  { key: 'Drive Fuel (L)',             header: 'Drive\nFuel (L)',       width: 12,  type: 'drive',  numFmt: numFmt2 },
+  { key: 'Idle Fuel (L)',              header: 'Idle\nFuel (L)',        width: 12,  type: 'idle',   numFmt: numFmt2 },
   { key: 'Avg Driving Days/Trip',      header: 'Avg Drive\nDays/Trip',  width: 13,  type: 'drive',  numFmt: numFmt2 },
   { key: 'Avg Idle Days/Trip',         header: 'Avg Idle\nDays/Trip',   width: 13,  type: 'idle',   numFmt: numFmt2 },
   { key: 'Avg Fuel/Trip (L)',          header: 'Avg Fuel\n/Trip (L)',   width: 13,  type: 'fuel',   numFmt: numFmt2 },
-  { key: 'Road Dist/Trip (km)',        header: 'Road\nDist (km)',       width: 12,  numFmt: numFmt2 },
+  { key: 'Total Dist (km)',            header: 'Total\nDist (km)',      width: 12,  numFmt: numFmt2 },
+  { key: 'Dist Source',                header: 'Dist\nSource',          width: 13,  align: 'center' },
   { key: 'Avg L/km (total fuel)',      header: 'L/km\n(total)',         width: 12,  type: 'lkm',    numFmt: numFmt3 },
-  { key: 'Avg L/km (driving fuel)',    header: 'L/km\n(driving)',       width: 13,  type: 'lkm',    numFmt: numFmt3, headerBg: C.tealBg },
-  { key: 'Avg L/100km (driving)',      header: 'L/100km\n(driving)',    width: 14,  type: 'lkm',    numFmt: numFmt2 },
+  { key: 'Avg L/km (drive fuel)',      header: 'L/km\n(drive)',         width: 13,  type: 'lkm',    numFmt: numFmt3, headerBg: C.tealBg },
+  { key: 'Avg L/100km (drive)',        header: 'L/100km\n(drive)',      width: 14,  type: 'lkm',    numFmt: numFmt2 },
   { key: 'Rating',                     header: 'Rating',                width: 24,  type: 'rating'  },
 ];
 
@@ -247,10 +270,20 @@ const RANK_OVERALL_COLS = RANK_COLS.map((c) => {
   wb.created  = new Date();
   wb.modified = new Date();
 
+  // Sort trip rows: best L/km first (ascending), nulls last
+  function sortByLkm(rows) {
+    return [...rows].sort((a, b) => {
+      const ka = Number(a['L/km (drive fuel)'] ?? a['L/km (total fuel)']) || 999;
+      const kb = Number(b['L/km (drive fuel)'] ?? b['L/km (total fuel)']) || 999;
+      return ka - kb;
+    });
+  }
+
   // ── Helper: add styled sheet ───────────────────────────────────────────────
-  function addStyledSheet(name, srcName, colDefs) {
-    const rows = readSheet(srcName);
+  function addStyledSheet(name, srcName, colDefs, sortFn) {
+    let rows = readSheet(srcName);
     if (!rows) { console.warn(`  ⚠️  Sheet not found: ${srcName}`); return; }
+    if (sortFn) rows = sortFn(rows);
     const ws = wb.addWorksheet(name, { properties: { tabColor: { argb: 'FF1B3A5C' } } });
     styleDataSheet(ws, rows, colDefs);
     console.log(`  ✅  ${name} (${rows.length} rows)`);
@@ -263,7 +296,7 @@ const RANK_OVERALL_COLS = RANK_COLS.map((c) => {
   addStyledSheet('📊 By Direction Rankings',  '📊 By Direction Rankings', RANK_COLS);
 
   // ── All Trips ──────────────────────────────────────────────────────────────
-  addStyledSheet('🗺 All Trips',              '🗺 All Trips',            TRIP_COLS);
+  addStyledSheet('🗺 All Trips',              '🗺 All Trips',            TRIP_COLS, sortByLkm);
 
   // ── Route sheets ──────────────────────────────────────────────────────────
   const routeSheets = [
@@ -273,13 +306,13 @@ const RANK_OVERALL_COLS = RANK_COLS.map((c) => {
     ['⚓ Vikindu→Port',      '⚓ Vikindu→Port'],
   ];
   for (const [name, src] of routeSheets) {
-    addStyledSheet(name, src, TRIP_COLS);
+    addStyledSheet(name, src, TRIP_COLS, sortByLkm);
   }
 
   // ── Per-vehicle sheets ─────────────────────────────────────────────────────
   for (const sn of srcWb.SheetNames) {
     if (!sn.startsWith('🚛')) continue;
-    addStyledSheet(sn, sn, TRIP_COLS);
+    addStyledSheet(sn, sn, TRIP_COLS, sortByLkm);
   }
 
   // ── Cover / Summary sheet ─────────────────────────────────────────────────
@@ -352,7 +385,7 @@ const RANK_OVERALL_COLS = RANK_COLS.map((c) => {
   coverTitle(rRow++, '  VEHICLE RANKINGS (best → worst L/km driving)', C.tealBg, 'FFFFFFFF', 11);
   for (const r of rankRows.slice(0, 15)) {
     coverKV(rRow++, `${r['Rank']}. ${r['Vehicle']}  (${r['Direction'] || 'All'})`,
-      `${r['Avg L/km (driving fuel)'] ?? r['Avg L/km (total fuel)'] ?? '—'} L/km  |  ${r['Trips']} trips`,
+      `${r['Avg L/km (drive fuel)'] ?? r['Avg L/km (total fuel)'] ?? '—'} L/km  |  ${r['Trips']} trips`,
       'FFE8F4FB');
   }
 
