@@ -168,19 +168,20 @@ function addSheet(wb, data, sheetName) {
   //   used = startFuel(depDay) + sum(refueling events in window) − endFuel(arrDay)
   const [rows] = await conn.query(`
     SELECT
-      vi.ID                                                           AS vehiID,
-      TRIM(REPLACE(REPLACE(vi.VehiIDNO,'(CANTER)',''),'(TRUCK)','')) AS plate,
-      vi.VehiIDNO                                                     AS plateRaw,
-      co.Name                                                         AS company,
-      vd.GPSDate                                                      AS date,
-      vd.SYouLiang / 100                                              AS startFuelL,
-      vd.EYouLiang / 100                                              AS endFuelL,
-      vd.SLiCheng / 1000                                             AS startOdomKm,
-      vd.ELiCheng / 1000                                             AS endOdomKm,
-      vd.CalcRunYouHao / 100                                         AS calcDriveFuelL,
-      vd.CalcIdelYouhao / 100                                        AS calcIdleFuelL,
-      vd.CalcIdelTime                                                AS idleTimeSec,
-      vd.DriveTime                                                   AS driveTimeSec
+      vi.ID                                                                AS vehiID,
+      TRIM(REPLACE(REPLACE(vi.VehiIDNO,'(CANTER)',''),'(TRUCK)',''))      AS plate,
+      vi.VehiIDNO                                                          AS plateRaw,
+      co.Name                                                              AS company,
+      vd.GPSDate                                                           AS date,
+      vd.NoGps                                                             AS noGps,
+      CAST(vd.SYouLiang AS SIGNED) / 100                                   AS startFuelL,
+      CAST(vd.EYouLiang AS SIGNED) / 100                                   AS endFuelL,
+      vd.SLiCheng / 1000                                                  AS startOdomKm,
+      vd.ELiCheng / 1000                                                  AS endOdomKm,
+      CAST(vd.CalcRunYouHao  AS SIGNED) / 100                              AS calcDriveFuelL,
+      CAST(vd.CalcIdelYouhao AS SIGNED) / 100                              AS calcIdleFuelL,
+      vd.CalcIdelTime                                                      AS idleTimeSec,
+      vd.DriveTime                                                         AS driveTimeSec
     FROM jt808_vehicle_daily vd
     JOIN jt808_vehicle_info  vi ON vi.ID = vd.VehiID
     JOIN jt808_company_info  co ON co.ID = vi.CompanyID
@@ -188,6 +189,7 @@ function addSheet(wb, data, sheetName) {
       AND vd.GPSDate >= DATE_SUB(CURDATE(), INTERVAL 180 DAY)
       AND vd.SYouLiang > 0
       AND vd.EYouLiang > 0
+      AND vd.NoGps = 0
     ORDER BY vi.ID, vd.GPSDate`);
 
   console.log(`Fetched ${rows.length} daily records (all days, incl. refuel days)`);
@@ -197,17 +199,24 @@ function addSheet(wb, data, sheetName) {
   for (const r of rows) {
     const ds = dateStr(r.date);
     if (!dailyByVehicle[r.vehiID]) dailyByVehicle[r.vehiID] = {};
+    const startL = Number(r.startFuelL);
+    const endL   = Number(r.endFuelL);
+    // Flag stale sensor: fuel didn't change at all despite significant drive time
+    const driveS = Number(r.driveTimeSec) || 0;
+    const fuelDelta = Math.abs(endL - startL);
+    const sensorStale = fuelDelta < 0.5 && driveS > 3600;
     dailyByVehicle[r.vehiID][ds] = {
       plate:           r.plate,
       company:         r.company,
-      startFuelL:      fmt2(r.startFuelL),
-      endFuelL:        fmt2(r.endFuelL),
+      startFuelL:      sensorStale ? null : fmt2(startL),
+      endFuelL:        sensorStale ? null : fmt2(endL),
+      sensorStale,
       startOdomKm:     fmt2(r.startOdomKm),
       endOdomKm:       fmt2(r.endOdomKm),
       calcDriveFuelL:  fmt2(r.calcDriveFuelL),
       calcIdleFuelL:   fmt2(r.calcIdleFuelL),
       idleTimeSec:     Number(r.idleTimeSec) || 0,
-      driveTimeSec:    Number(r.driveTimeSec) || 0,
+      driveTimeSec:    driveS,
     };
   }
 
@@ -283,16 +292,21 @@ function addSheet(wb, data, sheetName) {
     const arrDay = vDays[dsB];
     if (!depDay || !arrDay) return null;
 
+    // If the departure or arrival day has a stale sensor, fuel is unreliable
+    if (depDay.sensorStale || arrDay.sensorStale) return null;
+    if (depDay.startFuelL == null || arrDay.endFuelL == null) return null;
+
     const startFuel = depDay.startFuelL;
     const endFuel   = arrDay.endFuelL;
 
-    // Sum refueling: any day in window where endFuel > startFuel
+    // Sum genuine refueling events: positive delta ≥ 20L (filters sensor noise & small corrections)
+    // Also skip any day with a stale sensor flag in the window
     let refueled = 0;
     for (const ds of dateRange(dsA, dsB)) {
       const day = vDays[ds];
-      if (day && day.endFuelL > day.startFuelL) {
-        refueled += day.endFuelL - day.startFuelL;
-      }
+      if (!day || day.sensorStale || day.startFuelL == null || day.endFuelL == null) continue;
+      const delta = day.endFuelL - day.startFuelL;
+      if (delta >= 20) refueled += delta;  // genuine refuel event only
     }
 
     const usedFuel = fmt2(startFuel + refueled - endFuel);
