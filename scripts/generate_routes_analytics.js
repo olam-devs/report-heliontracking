@@ -50,11 +50,12 @@ const WP = {
 };
 
 // ─── KNOWN ROAD DISTANCES (km) ───────────────────────────────────────────────
+// Corrected 2026-09-25 per operations: Mboga→Port 128km, Vikindu↔Port 18km
 const ROAD_KM = {
-  'Mboga → Port (Direct)':     18,
-  'Mboga → Port (via Ubungo)': 18,
-  'Port → Vikindu':            28,
-  'Vikindu → Port':            28,
+  'Mboga → Port (Direct)':     128,
+  'Mboga → Port (via Ubungo)': 128,
+  'Port → Vikindu':             18,
+  'Vikindu → Port':             18,
 };
 
 // GPS threshold: days with total track distance ≥ this are "driving days"
