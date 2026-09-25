@@ -142,8 +142,7 @@ function styleDataSheet(ws, rows, colDefs) {
       if (c.key === 'Rank' && medal) return `${medal} ${row[c.key] ?? ''}`;
       // Always recompute Rating from L/km + Direction so source errors don't carry over
       if (c.key === 'Rating') {
-        const lkm = row['L/km (drive fuel)'] ?? row['L/km (total fuel)']
-                 ?? row['Avg L/km (drive fuel)'] ?? row['Avg L/km (total fuel)'];
+        const lkm = row['L/km'] ?? row['Avg L/km'];
         return computeRating(lkm, row['Direction']);
       }
       return row[c.key] ?? null;
@@ -213,15 +212,12 @@ const TRIP_COLS = [
   { key: 'Total Fuel (L)',       header: 'Total\nFuel (L)',   width: 12, type: 'fuel',   numFmt: numFmt2, headerBg: C.steelBg },
   { key: 'Driving Days',         header: 'Driving\nDays',    width: 11, type: 'drive',  align: 'center' },
   { key: 'Idle Days',            header: 'Idle\nDays',       width: 10, type: 'idle',   align: 'center' },
-  { key: 'Drive Fuel (L)',       header: 'Drive\nFuel (L)',   width: 12, type: 'drive',  numFmt: numFmt2 },
   { key: 'Idle Fuel (L)',        header: 'Idle\nFuel (L)',    width: 12, type: 'idle',   numFmt: numFmt2 },
   { key: 'Drive Time (hrs)',     header: 'Drive\nTime (h)',   width: 11, type: 'drive',  numFmt: numFmt2 },
   { key: 'Idle Time (hrs)',      header: 'Idle\nTime (h)',    width: 11, type: 'idle',   numFmt: numFmt2 },
   { key: 'Odometer (km)',        header: 'Odom\n(km)',        width: 11, numFmt: numFmt2 },
   { key: 'Road Dist (km)',       header: 'Road\nDist (km)',   width: 11, numFmt: numFmt2 },
-  { key: 'Dist Used',            header: 'Dist\nSource',      width: 13, align: 'center' },
-  { key: 'L/km (total fuel)',    header: 'L/km\n(total)',     width: 12, type: 'lkm',    numFmt: numFmt3 },
-  { key: 'L/km (drive fuel)',    header: 'L/km\n(drive)',     width: 12, type: 'lkm',    numFmt: numFmt3, headerBg: C.tealBg },
+  { key: 'L/km',                 header: 'L/km',              width: 12, type: 'lkm',    numFmt: numFmt3, headerBg: C.tealBg },
   { key: 'Rating',               header: 'Rating',            width: 26, type: 'rating'  },
 ];
 
@@ -232,24 +228,24 @@ const RANK_COLS = [
   { key: 'Direction',                  header: 'Direction',             width: 26,  align: 'left'   },
   { key: 'Trips',                      header: 'Trips',                 width:  8,  align: 'center' },
   { key: 'Total Fuel Used (L)',        header: 'Total\nFuel (L)',       width: 12,  type: 'fuel',   numFmt: numFmt2 },
-  { key: 'Drive Fuel (L)',             header: 'Drive\nFuel (L)',       width: 12,  type: 'drive',  numFmt: numFmt2 },
-  { key: 'Idle Fuel (L)',              header: 'Idle\nFuel (L)',        width: 12,  type: 'idle',   numFmt: numFmt2 },
+  { key: 'Total Idle Fuel (L)',        header: 'Total Idle\nFuel (L)',  width: 13,  type: 'idle',   numFmt: numFmt2 },
   { key: 'Avg Driving Days/Trip',      header: 'Avg Drive\nDays/Trip',  width: 13,  type: 'drive',  numFmt: numFmt2 },
   { key: 'Avg Idle Days/Trip',         header: 'Avg Idle\nDays/Trip',   width: 13,  type: 'idle',   numFmt: numFmt2 },
   { key: 'Avg Fuel/Trip (L)',          header: 'Avg Fuel\n/Trip (L)',   width: 13,  type: 'fuel',   numFmt: numFmt2 },
+  { key: 'Road Dist/Trip (km)',        header: 'Road Dist\n/Trip (km)', width: 13,  numFmt: numFmt2 },
   { key: 'Total Dist (km)',            header: 'Total\nDist (km)',      width: 12,  numFmt: numFmt2 },
-  { key: 'Dist Source',                header: 'Dist\nSource',          width: 13,  align: 'center' },
-  { key: 'Avg L/km (total fuel)',      header: 'L/km\n(total)',         width: 12,  type: 'lkm',    numFmt: numFmt3 },
-  { key: 'Avg L/km (drive fuel)',      header: 'L/km\n(drive)',         width: 13,  type: 'lkm',    numFmt: numFmt3, headerBg: C.tealBg },
-  { key: 'Avg L/100km (drive)',        header: 'L/100km\n(drive)',      width: 14,  type: 'lkm',    numFmt: numFmt2 },
+  { key: 'Avg L/km',                   header: 'L/km',                  width: 12,  type: 'lkm',    numFmt: numFmt3, headerBg: C.tealBg },
+  { key: 'Avg L/100km',               header: 'L/100km',               width: 13,  type: 'lkm',    numFmt: numFmt2 },
   { key: 'Rating',                     header: 'Rating',                width: 24,  type: 'rating'  },
 ];
 
-// Rank cols for overall (slightly different keys)
+// Rank cols for overall sheet (different key names than per-direction ranking)
 const RANK_OVERALL_COLS = RANK_COLS.map((c) => {
   const map = {
-    'Total Fuel Used (L)': 'Total Fuel (L)',
-    'Avg Fuel/Trip (L)': 'Avg Fuel/Trip (L)',
+    'Total Fuel Used (L)':  'Total Fuel (L)',
+    'Total Idle Fuel (L)':  'Total Idle Fuel (L)',
+    'Road Dist/Trip (km)':  'Total Road Dist (km)',
+    'Total Dist (km)':      'Total Road Dist (km)',
   };
   return { ...c, key: map[c.key] || c.key };
 });
@@ -273,8 +269,8 @@ const RANK_OVERALL_COLS = RANK_COLS.map((c) => {
   // Sort trip rows: best L/km first (ascending), nulls last
   function sortByLkm(rows) {
     return [...rows].sort((a, b) => {
-      const ka = Number(a['L/km (drive fuel)'] ?? a['L/km (total fuel)']) || 999;
-      const kb = Number(b['L/km (drive fuel)'] ?? b['L/km (total fuel)']) || 999;
+      const ka = Number(a['L/km'] ?? a['Avg L/km']) || 999;
+      const kb = Number(b['L/km'] ?? b['Avg L/km']) || 999;
       return ka - kb;
     });
   }
@@ -385,7 +381,7 @@ const RANK_OVERALL_COLS = RANK_COLS.map((c) => {
   coverTitle(rRow++, '  VEHICLE RANKINGS (best → worst L/km driving)', C.tealBg, 'FFFFFFFF', 11);
   for (const r of rankRows.slice(0, 15)) {
     coverKV(rRow++, `${r['Rank']}. ${r['Vehicle']}  (${r['Direction'] || 'All'})`,
-      `${r['Avg L/km (drive fuel)'] ?? r['Avg L/km (total fuel)'] ?? '—'} L/km  |  ${r['Trips']} trips`,
+      `${r['Avg L/km'] ?? '—'} L/km  |  ${r['Trips']} trips`,
       'FFE8F4FB');
   }
 
