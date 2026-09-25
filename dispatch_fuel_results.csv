@@ -1,0 +1,436 @@
+Date,VehicleClean,TripType,gpsDate,startFuel_L,endFuel_L,usedFuel_L,driveHrs,idleHrs,passedUbungo,passedPort,passedVikindu,sensorStale,note
+2026-09-17,T317ELP,Ubungo→Port (Stock),2026-09-17,121.09,219.34,-98.25,1.76,1.26,NO,NO,NO,false,
+2026-09-23,T895ERP,Ubungo→Port (Stock),2026-09-23,151.44,208.46,-57.02,7.56,2.89,NO,NO,NO,false,
+2026-09-22,T468EMV,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-09-22,T894ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-09-22,T662EJM,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-09-22,T621EMB,Port↔Vikindu,2026-09-22,171.62,175.03,-3.41,9.75,3.65,NO,NO,NO,false,
+2026-09-22,T889ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-09-22,T624EMB,Port↔Vikindu,2026-09-22,195.72,250.17,-54.45,8.29,4.21,NO,NO,NO,false,
+2026-09-23,T889ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-09-23,T892ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-09-23,T890ERP,Ubungo→Port (Stock),2026-09-23,45.08,46.38,-1.3,5.42,2.88,NO,NO,NO,false,
+2026-09-22,T318ELP,Port↔Vikindu,2026-09-22,320.7,592.43,-271.73,9.47,3.75,NO,NO,NO,false,
+2026-09-22,T890ERP,Port↔Vikindu,2026-09-22,,,,9.06,6.52,NO,NO,NO,true,STALE SENSOR
+2026-09-23,T662EJM,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-09-18,T769EMX,Port↔Vikindu,2026-09-18,132.73,186.79,-54.06,8.72,3.52,NO,YES,NO,false,
+2026-09-20,T889ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-09-18,T889ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-09-20,T624EMB,Port↔Vikindu,2026-09-20,120.79,114.99,5.8,0.13,0.29,NO,NO,NO,false,
+2026-09-18,T624EMB,Port↔Vikindu,2026-09-18,172.62,225.73,-53.11,6.07,4.29,YES,NO,NO,false,
+2026-09-22,T892ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-09-20,T892ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-09-18,T892ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-09-22,T314ELP,Port↔Vikindu,2026-09-22,303.63,302.01,1.62,9.6,7.95,NO,NO,NO,false,
+2026-09-22,T895ERP,Port↔Vikindu,2026-09-22,43.99,151.48,-107.49,8.49,4.96,NO,NO,NO,false,
+2026-09-22,T894ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-09-20,T890ERP,Port↔Vikindu,2026-09-20,,,,4.07,1.47,NO,NO,NO,true,STALE SENSOR
+2026-09-18,T890ERP,Port↔Vikindu,2026-09-18,46.97,46.07,0.9,7.91,3.97,NO,YES,NO,false,
+2026-09-21,T890ERP,Port↔Vikindu,2026-09-21,45.38,44.71,0.67,4.52,3.87,YES,NO,NO,false,
+2026-09-22,T890ERP,Ubungo→Port (Stock),2026-09-22,,,,9.06,6.52,NO,NO,NO,true,STALE SENSOR
+2026-09-22,T662EJM,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-09-21,T314ELP,Ubungo→Port (Stock),2026-09-21,260.77,303.63,-42.86,5.99,3.4,NO,NO,NO,false,
+2026-09-21,T895ERP,Ubungo→Port (Stock),2026-09-21,137.89,43.99,93.9,6.51,2.16,NO,NO,NO,false,
+2026-09-15,T661EJM,Ubungo→Port (Stock),2026-09-15,400.35,334.28,66.07,3.8,1.94,NO,NO,NO,false,
+2026-09-15,T768EMX,Ubungo→Port (Stock),2026-09-15,345.9,265.32,80.58,7.39,1.15,YES,NO,NO,false,
+2026-09-14,T768EMX,Ubungo→Port (Stock),2026-09-14,432.34,371.35,60.99,5.2,0.97,YES,NO,NO,false,
+2026-09-15,T893ERP,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-09-14,T893ERP,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-09-20,T769EMX,Port↔Vikindu,2026-09-20,108.19,193.2,-85.01,2.93,3.33,NO,NO,NO,false,
+2026-09-20,T662EJM,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-09-20,T621EMB,Port↔Vikindu,Mon Sep 21,234.76,171.62,63.14,3.59,,,,,false,DATA FROM Mon Sep 21 (±1 day)
+2026-09-20,T318ELP,Port↔Vikindu,2026-09-20,462.99,414.25,48.74,4.49,1.48,NO,NO,NO,false,
+2026-09-11,T887ERP,Port↔Vikindu,2026-09-11,197.51,117.69,79.82,5.53,3.33,YES,NO,NO,false,
+2026-09-18,T621EMB,Port↔Vikindu,Thu Sep 17,292.94,276.25,16.69,0.71,,,,,false,DATA FROM Thu Sep 17 (±1 day)
+2026-09-11,T621EMB,Port↔Vikindu,2026-09-11,552.31,434.07,118.24,5.91,2.07,NO GPS,NO GPS,NO GPS,false,
+2026-09-18,T662EJM,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-09-11,T662EJM,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-09-20,T890ERP,Ubungo→Port (Stock),2026-09-20,,,,4.07,1.47,NO,NO,NO,true,STALE SENSOR
+2026-09-20,T662EJM,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-09-20,T621EMB,Ubungo→Port (Stock),Mon Sep 21,234.76,171.62,63.14,3.59,,,,,false,DATA FROM Mon Sep 21 (±1 day)
+2026-09-20,T889ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-09-19,T318ELP,Ubungo→Port (Stock),2026-09-19,543.77,463.07,80.7,5.04,3.35,NO,NO,NO,false,
+2026-09-11,T774EMX,Port↔Vikindu,2026-09-11,523.67,480.37,43.3,4.75,3.81,NO,YES,NO,false,
+2026-09-18,T318ELP,Port↔Vikindu,2026-09-18,139.29,544.26,-404.97,8.66,3.97,NO,YES,NO,false,
+2026-09-15,T884ERP,Ubungo→Port (Stock),2026-09-15,239.18,591.53,-352.35,0.08,0.19,NO,NO,NO,false,
+2026-09-11,T884ERP,Port↔Vikindu,2026-09-11,446.72,407.21,39.51,3.82,4.47,NO,YES,NO,false,
+2026-09-11,T318ELP,Port↔Vikindu,2026-09-11,530.39,494.07,36.32,3.32,3.67,NO,YES,NO,false,
+2026-09-11,T894ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-09-08,T894ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-09-04,T317ELP,Port↔Vikindu,2026-09-04,557.05,560.15,-3.1,0.01,0.1,YES,NO,NO,false,
+2026-09-11,T317ELP,Port↔Vikindu,2026-09-11,388.7,353.81,34.89,1.4,2.27,NO,YES,NO,false,
+2026-09-08,T886ERP,Ubungo→Port (Stock),2026-09-08,125.88,171.62,-45.74,4.25,1.5,NO,NO,NO,false,
+2026-09-09,T886ERP,Ubungo→Port (Stock),2026-09-09,168.98,114.59,54.39,4.01,1.44,YES,NO,NO,false,
+2026-09-12,T886ERP,Ubungo→Port (Stock),2026-09-12,108.39,55.99,52.4,3.99,0.86,NO,NO,NO,false,
+2026-08-05,T892ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-08-18,T892ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-08-19,T892ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-08-26,T890ERP,Ubungo→Port (Stock),2026-08-26,93.39,94.5,-1.11,3.77,2.26,NO,NO,NO,false,
+2026-09-03,T890ERP,Ubungo→Port (Stock),2026-09-03,,,,3.86,1.04,NO,NO,NO,true,STALE SENSOR
+2026-09-04,T890ERP,Port↔Vikindu,Thu Sep 03,,,,3.86,,,,,true,DATA FROM Thu Sep 03 (±1 day) STALE SENSOR
+2026-08-31,T769EMX,Ubungo→Port (Stock),2026-08-31,32.59,102.39,-69.8,3.99,1.52,NO,NO,NO,false,
+2026-07-31,T887ERP,Port↔Vikindu,2026-07-31,310.11,227.62,82.49,5.26,2.29,YES,NO,NO,false,
+2026-08-24,T889ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-08-04,T893ERP,Ubungo→Port (Stock),2026-08-04,118.99,273.85,-154.86,3.97,0.88,NO,NO,NO,false,
+2026-07-31,T314ELP,Port↔Vikindu,2026-07-31,223.89,145.33,78.56,5.57,3.72,YES,NO,NO,false,
+2026-08-26,T886ERP,Ubungo→Port (Stock),Thu Aug 27,186.99,165.55,21.44,3.38,,,,,false,DATA FROM Thu Aug 27 (±1 day)
+2026-08-28,T314ELP,Ubungo→Port (Stock),2026-08-28,304.87,302,2.87,4.35,2.07,NO,NO,NO,false,
+2026-09-02,T314ELP,Ubungo→Port (Stock),2026-09-02,302,201.99,100.01,4.06,2.45,NO,NO,NO,false,
+2026-09-01,T317ELP,Ubungo→Port (Stock),2026-09-01,167.87,325.24,-157.37,2.41,0.82,NO,NO,NO,false,
+2026-09-05,T887ERP,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-09-10,T887ERP,Ubungo→Port (Stock),2026-09-10,51.93,197.51,-145.58,4.05,1.22,NO,NO,NO,false,
+2026-08-19,T768EMX,Ubungo→Port (Stock),2026-08-19,32.59,182.23,-149.64,4.12,0.79,NO,NO,NO,false,
+2026-08-27,T768EMX,Ubungo→Port (Stock),2026-08-27,140.99,80.3,60.69,3.59,0.89,NO,NO,NO,false,
+2026-08-24,T768EMX,Ubungo→Port (Stock),2026-08-24,32.59,180.3,-147.71,3.74,1.02,NO,NO,NO,false,
+2026-08-29,T768EMX,Ubungo→Port (Stock),2026-08-29,40.72,184.66,-143.94,3.71,1.85,NO,NO,NO,false,
+2026-09-01,T768EMX,Ubungo→Port (Stock),2026-09-01,157.19,97.8,59.39,3.55,0.82,NO,NO,NO,false,
+2026-08-18,T621EMB,Ubungo→Port (Stock),2026-08-18,182.74,127.53,55.21,0.97,0.77,NO,NO,NO,false,
+2026-08-21,T621EMB,Ubungo→Port (Stock),2026-08-21,86.84,158.18,-71.34,1.84,0.71,NO,NO,NO,false,
+2026-09-10,T621EMB,Ubungo→Port (Stock),2026-09-10,33.07,552.33,-519.26,0.42,0.2,NO GPS,NO GPS,NO GPS,false,
+2026-07-17,T892ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-08-28,T895ERP,Ubungo→Port (Stock),2026-08-28,88.8,204.37,-115.57,5.4,1.61,NO,NO,NO,false,
+2026-09-01,T895ERP,Ubungo→Port (Stock),2026-09-01,167.26,117.16,50.1,4.23,0.88,NO,NO,NO,false,
+2026-09-04,T895ERP,Ubungo→Port (Stock),Thu Sep 03,77.51,78.62,-1.11,0,,,,,false,DATA FROM Thu Sep 03 (±1 day)
+2026-09-09,T895ERP,Ubungo→Port (Stock),2026-09-09,195.89,188.51,7.38,0.4,0.66,NO,NO,NO,false,
+2026-09-11,T895ERP,Port↔Vikindu,2026-09-11,143.69,170.3,-26.61,9.73,2.63,YES,NO,NO,false,
+2026-08-29,T661EJM,Ubungo→Port (Stock),2026-08-29,179.3,57.49,121.81,7.77,1.99,NO,NO,NO,false,
+2026-08-28,T661EJM,Ubungo→Port (Stock),2026-08-28,73.26,179.3,-106.04,7.56,1.45,NO,NO,NO,false,
+2026-09-02,T661EJM,Ubungo→Port (Stock),2026-09-02,61.74,179.1,-117.36,6.28,1.87,NO,NO,NO,false,
+2026-08-21,T885ERP,Ubungo→Port (Stock),2026-08-21,77.92,220.49,-142.57,4.6,1.63,NO,NO,NO,false,
+2026-08-24,T885ERP,Ubungo→Port (Stock),2026-08-24,174.86,122.28,52.58,3.69,1.01,NO,NO,NO,false,
+2026-08-27,T885ERP,Ubungo→Port (Stock),2026-08-27,72.76,229.88,-157.12,4.04,1.27,NO,NO,NO,false,
+2026-09-11,T885ERP,Port↔Vikindu,2026-09-11,562.61,438.67,123.94,8.32,3.93,YES,NO,NO,false,
+2026-08-17,T895ERP,Ubungo→Port (Stock),2026-08-17,178.19,131.19,47,4.18,1.08,NO,NO,NO,false,
+2026-09-10,T892ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-07-29,T624EMB,Ubungo→Port (Stock),Thu Jul 30,208.76,208.35,0.41,0.03,,,,,false,DATA FROM Thu Jul 30 (±1 day)
+2026-07-31,T624EMB,Port↔Vikindu,2026-07-31,208.35,38.34,170.01,6.06,4.72,YES,NO,NO,false,
+2026-09-11,T624EMB,Ubungo→Port (Stock),2026-09-11,56.79,250.19,-193.4,0.22,0.58,NO,NO,NO,false,
+2026-09-09,T891ERP,Ubungo→Port (Stock),2026-09-09,32.98,184.05,-151.07,3.85,1.3,NO,NO,NO,false,
+2026-09-11,T891ERP,Port↔Vikindu,2026-09-11,167.26,127.04,40.22,4.05,3.92,NO,YES,NO,false,
+2026-08-29,T282EHK,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-09-03,T282EHK,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-08-14,T774EMX,Ubungo→Port (Stock),2026-08-14,68.79,220.79,-152,4.75,1.21,NO,NO,NO,false,
+2026-08-26,T774EMX,Ubungo→Port (Stock),2026-08-26,122.7,185.44,-62.74,2.8,0.78,NO,NO,NO,false,
+2026-08-31,T774EMX,Ubungo→Port (Stock),2026-08-31,171.41,204.76,-33.35,4.14,1.09,NO,NO,NO,false,
+2026-08-18,T662EJM,Ubungo→Port (Stock),2026-08-18,72.56,211.38,-138.82,4,0.87,NO,NO,NO,false,
+2026-08-20,T662EJM,Ubungo→Port (Stock),2026-08-20,165.95,111.59,54.36,4.51,1.19,NO,NO,NO,false,
+2026-08-22,T662EJM,Ubungo→Port (Stock),2026-08-22,68.19,216.07,-147.88,4.41,2.71,NO,NO,NO,false,
+2026-07-31,T774EMX,Port↔Vikindu,2026-07-31,229.07,139.08,89.99,5.08,5.36,YES,NO,NO,false,
+2026-08-22,T468EMV,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-09-08,T316ELP,Ubungo→Port (Stock),2026-09-08,247.41,244.64,2.77,0,0.35,YES,NO,NO,false,
+2026-09-05,T893ERP,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-16,T887ERP,Port↔Vikindu,2026-07-16,286.77,251.16,35.61,2.12,5.61,YES,NO,NO,false,
+2026-08-17,T884ERP,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-21,T887ERP,Ubungo→Port (Stock),2026-07-21,147.18,325.03,-177.85,4.68,2.48,NO,NO,NO,false,
+2026-07-19,T887ERP,Ubungo→Port (Stock),2026-07-19,269.18,190.12,79.06,6.95,0.73,YES,NO,NO,false,
+2026-07-17,T887ERP,Port↔Vikindu,2026-07-17,251.32,286.44,-35.12,7.76,1.96,YES,NO,NO,false,
+2026-08-07,T316ELP,Ubungo→Port (Stock),2026-08-07,235.18,277.31,-42.13,8.18,3.4,NO,NO,NO,false,
+2026-08-08,T468EMV,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-31,T468EMV,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-18,T774EMX,Ubungo→Port (Stock),2026-07-18,351.46,199.02,152.44,4.52,2.09,NO,NO,NO,false,
+2026-08-11,T282EHK,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-08-05,T895ERP,Ubungo→Port (Stock),2026-08-05,204.93,255.52,-50.59,4.02,0.85,NO,NO,NO,false,
+2026-07-17,T895ERP,Ubungo→Port (Stock),2026-07-17,276.48,250.49,25.99,2.72,0.43,NO,NO,NO,false,
+2026-08-15,T885ERP,Ubungo→Port (Stock),2026-08-15,154.88,155.08,-0.2,0.11,0.66,NO,NO,NO,false,
+2026-08-11,T661EJM,Ubungo→Port (Stock),2026-08-11,382.17,326.37,55.8,4.32,3.54,NO,NO,NO,false,
+2026-08-13,T318ELP,Ubungo→Port (Stock),2026-08-13,111.39,258.09,-146.7,3.86,0.98,NO,NO,NO,false,
+2026-08-10,T318ELP,Ubungo→Port (Stock),2026-08-10,196.69,143.89,52.8,4,1.49,NO,NO,NO,false,
+2026-07-31,T317ELP,Port↔Vikindu,2026-07-31,358.71,259.66,99.05,7.67,2.72,NO,NO,NO,false,
+2026-08-15,T889ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-08-17,T769EMX,Ubungo→Port (Stock),2026-08-17,225.44,154.18,71.26,3.64,2.53,NO,NO,NO,false,
+2026-08-11,T769EMX,Ubungo→Port (Stock),2026-08-11,259.39,309.5,-50.11,6.49,2.79,NO,NO,NO,false,
+2026-07-18,T769EMX,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-08-07,T890ERP,Ubungo→Port (Stock),2026-08-07,119.19,133.79,-14.6,7.34,3.76,NO,NO,NO,false,
+2026-07-31,T890ERP,Port↔Vikindu,2026-07-31,167.77,168.68,-0.91,5.23,5.09,YES,NO,NO,false,
+2026-07-29,T890ERP,Ubungo→Port (Stock),2026-07-29,116.39,193.05,-76.66,3.93,1.25,NO,NO,NO,false,
+2026-07-24,T890ERP,Ubungo→Port (Stock),2026-07-24,282.24,207.54,74.7,4.38,1.32,NO,NO,NO,false,
+2026-07-22,T890ERP,Ubungo→Port (Stock),2026-07-22,178.96,173.44,5.52,7.86,2.71,NO,NO,NO,false,
+2026-07-31,T894ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-07-17,T894ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-07-16,T774EMX,Port↔Vikindu,2026-07-16,84.21,68.2,16.01,1.22,5.39,YES,NO,NO,false,
+2026-07-16,T885ERP,Port↔Vikindu,2026-07-16,188.41,100.19,88.22,6.23,4.23,YES,NO,NO,false,
+2026-07-15,T894ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-07-15,T893ERP,Port↔Vikindu,2026-07-15,212.57,251.11,-38.54,5.37,2.38,YES,NO,NO,false,
+2026-08-07,T769EMX,Ubungo→Port (Stock),2026-08-07,285.74,190.23,95.51,6.56,2.36,NO,NO,NO,false,
+2026-07-31,T621EMB,Port↔Vikindu,2026-07-31,232.7,141.98,90.72,2.87,3.29,YES,NO,NO,false,
+2026-07-31,T282EHK,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-31,T885ERP,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-31,T891ERP,Port↔Vikindu,2026-07-31,135.28,94.2,41.08,3,2.17,YES,NO,NO,false,
+2026-07-31,T886ERP,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-31,T884ERP,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-30,T318ELP,Ubungo→Port (Stock),2026-07-30,165.13,359.16,-194.03,1.22,1.16,NO,NO,NO,false,
+2026-07-30,T282EHK,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-28,T885ERP,Ubungo→Port (Stock),2026-07-28,83.31,246.17,-162.86,4.1,1.61,NO,NO,NO,false,
+2026-07-28,T893ERP,Ubungo→Port (Stock),2026-07-28,216.07,274.63,-58.56,2.19,0.45,NO,NO,NO,false,
+2026-07-24,T282EHK,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-24,T318ELP,Ubungo→Port (Stock),2026-07-24,255.94,198.2,57.74,4.73,1.12,NO,NO,NO,false,
+2026-07-22,T282EHK,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-22,T769EMX,Ubungo→Port (Stock),Thu Jul 23,139.58,137.08,2.5,0.3,,,,,false,DATA FROM Thu Jul 23 (±1 day)
+2026-07-22,T318ELP,Ubungo→Port (Stock),2026-07-22,135.98,289.33,-153.35,7.92,2.43,YES,NO,NO,false,
+2026-07-22,T885ERP,Ubungo→Port (Stock),2026-07-22,271.36,179.9,91.46,7.67,2.14,NO,NO,NO,false,
+2026-07-19,T318ELP,Ubungo→Port (Stock),2026-07-19,83,224.94,-141.94,3.71,1.75,NO,NO,NO,false,
+2026-07-17,T318ELP,Ubungo→Port (Stock),2026-07-17,197,166.75,30.25,3.09,1.92,NO,NO,NO,false,
+2026-07-17,T282EHK,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-17,T890ERP,Port↔Vikindu,2026-07-17,261.79,568.07,-306.28,4.52,3.24,NO,YES,NO,false,
+2026-07-17,T893ERP,Port↔Vikindu,2026-07-17,236.67,600,-363.33,3.61,0.78,YES,NO,NO,false,
+2026-07-16,T889ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-07-16,T621EMB,Port↔Vikindu,2026-07-16,127.68,114.69,12.99,0.61,3.77,YES,NO,NO,false,
+2026-07-16,T282EHK,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-16,T893ERP,Ubungo→Port (Stock),2026-07-16,251.11,236.66,14.45,8.23,3.64,NO,YES,NO,false,
+2026-07-16,T314ELP,Ubungo→Port (Stock),2026-07-16,189.04,242.47,-53.43,6.32,4,NO,NO,NO,false,
+2026-07-15,T890ERP,Port↔Vikindu,2026-07-15,300.14,244.93,55.21,6.84,5.1,NO,NO,NO,false,
+2026-07-14,T890ERP,Port↔Vikindu,2026-07-14,318.33,300.14,18.19,12.27,7.24,YES,NO,NO,false,
+2026-07-11,T890ERP,Ubungo→Port (Stock),2026-07-11,129.9,276.48,-146.58,4.07,1.01,NO,NO,NO,false,
+2026-06-29,T890ERP,Ubungo→Port (Stock),2026-06-29,86.49,49.15,37.34,4.01,1.39,NO,NO,NO,false,
+2026-07-15,T892ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-07-15,T282EHK,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-15,T885ERP,Port↔Vikindu,2026-07-15,44.88,188.41,-143.53,9.02,4.46,YES,NO,NO,false,
+2026-07-14,T892ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-07-14,T282EHK,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-14,T885ERP,Port↔Vikindu,2026-07-14,137.08,44.88,92.2,8.9,3.93,YES,NO,NO,false,
+2026-07-12,T892ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-07-10,T885ERP,Ubungo→Port (Stock),2026-07-10,138.79,146.05,-7.26,3.93,1.15,NO,NO,NO,false,
+2026-07-06,T769EMX,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-04,T891ERP,Ubungo→Port (Stock),2026-07-04,,,,4.12,0.95,NO,NO,NO,true,STALE SENSOR
+2026-07-03,T468EMV,Port↔Vikindu,2026-07-03,32.68,32.88,-0.2,0.01,0,YES,NO,NO,false,
+2026-07-03,T316ELP,Port↔Vikindu,2026-07-03,139.19,119.38,19.81,2.44,3.22,YES,NO,NO,false,
+2026-07-02,T621EMB,Ubungo→Port (Stock),2026-07-02,96.88,262.62,-165.74,0.87,1.55,NO,NO,NO,false,
+2026-06-30,T769EMX,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-29,T621EMB,Ubungo→Port (Stock),2026-06-29,45.32,239.27,-193.95,0.15,0.68,NO,NO,NO,false,
+2026-06-26,T885ERP,Ubungo→Port (Stock),2026-06-26,78.01,147.07,-69.06,2.97,0.94,NO,NO,NO,false,
+2026-06-19,T769EMX,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-19,T318ELP,Port↔Vikindu,2026-06-19,240.83,172.33,68.5,6.78,3.81,NO,NO,NO,false,
+2026-06-18,T318ELP,Ubungo→Port (Stock),2026-06-18,98.59,240.83,-142.24,7.47,1.73,NO,NO,NO,false,
+2026-06-18,T769EMX,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-13,T885ERP,Ubungo→Port (Stock),2026-06-13,145.58,202.36,-56.78,3.83,2.17,NO,NO,NO,false,
+2026-06-01,T314ELP,Ubungo→Port (Stock),2026-06-01,106.49,180.15,-73.66,4.24,1.96,NO,NO,NO,false,
+2026-05-28,T314ELP,Port↔Vikindu,2026-05-28,112.79,114.2,-1.41,0.12,0.38,NO,NO,NO,false,
+2026-07-31,T661EJM,Port↔Vikindu,2026-07-31,347.58,220.55,127.03,8.98,5.67,YES,NO,NO,false,
+2026-07-29,T468EMV,Ubungo→Port (Stock),2026-07-29,387.06,358.87,28.19,0.47,0.24,NO,NO,NO,false,
+2026-07-25,T886ERP,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-24,T884ERP,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-18,T316ELP,Ubungo→Port (Stock),2026-07-18,136.49,281.86,-145.37,4.21,1.45,NO,NO,NO,false,
+2026-07-17,T884ERP,Port↔Vikindu,2026-07-17,268.67,321.47,-52.8,5.95,4.9,YES,NO,NO,false,
+2026-07-16,T468EMV,Ubungo→Port (Stock),Fri Jul 17,33.38,32.59,0.79,0.28,,,,,false,DATA FROM Fri Jul 17 (±1 day)
+2026-07-14,T893ERP,Port↔Vikindu,2026-07-14,102.59,212.57,-109.98,7.89,3.69,NO GPS,NO GPS,NO GPS,false,
+2026-07-01,T893ERP,Ubungo→Port (Stock),2026-07-01,109.7,207.54,-97.84,0.11,0.41,NO,NO,NO,false,
+2026-07-01,T316ELP,Ubungo→Port (Stock),2026-07-01,144.33,138.79,5.54,0.14,0.68,NO,NO,NO,false,
+2026-06-30,T468EMV,Ubungo→Port (Stock),2026-06-30,32.68,32.68,0,0,0,NO,NO,NO,false,
+2026-06-24,T468EMV,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-24,T886ERP,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-23,T886ERP,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-24,T661EJM,Ubungo→Port (Stock),2026-06-24,41.5,270.12,-228.62,0.3,1.27,NO,NO,NO,false,
+2026-06-24,T662EJM,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-29,T661EJM,Ubungo→Port (Stock),2026-06-29,57.78,216.16,-158.38,4.24,0.6,NO,NO,NO,false,
+2026-06-29,T886ERP,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-08,T662EJM,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-14,T661EJM,Port↔Vikindu,2026-07-14,206.61,234.51,-27.9,9.53,5.74,YES,NO,NO,false,
+2026-07-14,T886ERP,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-15,T661EJM,Port↔Vikindu,2026-07-15,235.39,248.96,-13.57,9.61,6.7,NO,YES,NO,false,
+2026-07-15,T886ERP,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-16,T661EJM,Port↔Vikindu,2026-07-16,248.96,241.09,7.87,9.26,4.65,NO,YES,NO,false,
+2026-07-16,T661EJM,Ubungo→Port (Stock),2026-07-16,248.96,241.09,7.87,9.26,4.65,NO,YES,NO,false,
+2026-07-17,T317ELP,Ubungo→Port (Stock),2026-07-17,398.24,366.79,31.45,1.04,1.24,NO,NO,NO,false,
+2026-07-17,T768EMX,Ubungo→Port (Stock),2026-07-17,267.23,194.07,73.16,6.13,2.16,NO,NO,NO,false,
+2026-07-17,T886ERP,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-19,T317ELP,Ubungo→Port (Stock),2026-07-19,298.29,232.5,65.79,3.42,1.44,NO,NO,NO,false,
+2026-07-22,T768EMX,Ubungo→Port (Stock),2026-07-22,263.03,286.55,-23.52,7.11,1.27,YES,NO,NO,false,
+2026-06-05,T894ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-06-15,T892ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-06-18,T317ELP,Ubungo→Port (Stock),2026-06-18,141.18,285.1,-143.92,1.07,0.67,NO GPS,NO GPS,NO GPS,false,
+2026-06-18,T892ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-06-19,T892ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-06-19,T282EHK,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-19,T894ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-06-19,T314ELP,Port↔Vikindu,2026-06-19,250.08,139.64,110.44,7.84,5.38,NO,NO,NO,false,
+2026-06-23,T894ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-06-24,T314ELP,Ubungo→Port (Stock),2026-06-24,162.82,112,50.82,3.96,0.81,NO,NO,NO,false,
+2026-06-30,T317ELP,Ubungo→Port (Stock),2026-06-30,163.54,354.49,-190.95,1.3,1.25,NO,NO,NO,false,
+2026-06-30,T894ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-06-30,T768EMX,Ubungo→Port (Stock),2026-06-30,64.33,211.03,-146.7,3.81,1.23,NO,NO,NO,false,
+2026-07-01,T624EMB,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-02,T887ERP,Ubungo→Port (Stock),2026-07-02,259.12,252.85,6.27,0.24,1.24,NO,NO,NO,false,
+2026-07-02,T889ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-07-03,T282EHK,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-03,T314ELP,Ubungo→Port (Stock),2026-07-03,61.95,214.91,-152.96,4.06,0.6,NO,NO,NO,false,
+2026-07-06,T884ERP,Ubungo→Port (Stock),2026-07-06,186.88,185.37,1.51,0.2,0.67,NO,NO,NO,false,
+2026-07-07,T317ELP,Ubungo→Port (Stock),2026-07-07,272.74,267.14,5.6,0.16,0.42,NO,NO,NO,false,
+2026-07-09,T314ELP,Ubungo→Port (Stock),2026-07-09,183.24,132.89,50.35,4.15,1.67,NO,NO,NO,false,
+2026-07-10,T282EHK,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-10,T894ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-07-13,T887ERP,Ubungo→Port (Stock),2026-07-13,114.99,268.09,-153.1,3.7,1.2,NO,NO,NO,false,
+2026-07-13,T889ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-07-13,T282EHK,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-14,T889ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-07-14,T887ERP,Port↔Vikindu,2026-07-14,268.16,285.94,-17.78,8.89,3.65,YES,NO,NO,false,
+2026-07-14,T314ELP,Port↔Vikindu,2026-07-14,286.15,94.5,191.65,12.85,5.08,YES,NO,NO,false,
+2026-07-14,T884ERP,Port↔Vikindu,2026-07-14,256.04,209.36,46.68,13.63,7.64,YES,NO,NO,false,
+2026-07-15,T887ERP,Port↔Vikindu,2026-07-15,286.04,286.77,-0.73,10.03,6.12,NO,YES,NO,false,
+2026-07-15,T314ELP,Port↔Vikindu,2026-07-15,94.5,188.85,-94.35,9.7,4.03,NO,NO,NO,false,
+2026-07-15,T884ERP,Port↔Vikindu,2026-07-15,209.07,271.29,-62.22,6.14,6.33,NO,NO,NO,false,
+2026-07-16,T889ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-06-19,T893ERP,Port↔Vikindu,2026-06-19,170.21,201.58,-31.37,9.94,4.78,YES,NO,NO,false,
+2026-05-29,T889ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-06-12,T884ERP,Ubungo→Port (Stock),2026-06-12,239.41,238.16,1.25,0.12,0.46,NO,NO,NO,false,
+2026-06-12,T889ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-06-16,T895ERP,Ubungo→Port (Stock),2026-06-16,219.36,215.35,4.01,0.1,0.21,NO,NO,NO,false,
+2026-06-16,T768EMX,Ubungo→Port (Stock),2026-06-16,261.9,240.83,21.07,0.19,1.8,NO,NO,NO,false,
+2026-06-17,T774EMX,Ubungo→Port (Stock),2026-06-17,125.4,250.94,-125.54,7.56,1.15,NO,NO,NO,false,
+2026-06-17,T893ERP,Ubungo→Port (Stock),2026-06-17,84.21,221.12,-136.91,5.79,1.23,NO,NO,NO,false,
+2026-06-19,T887ERP,Port↔Vikindu,2026-06-19,337.21,343.24,-6.03,9.29,5.97,NO,NO,NO,false,
+2026-06-19,T774EMX,Port↔Vikindu,2026-06-19,200.4,255.31,-54.91,6.83,3.6,YES,NO,NO,false,
+2026-06-19,T768EMX,Port↔Vikindu,2026-06-19,194.19,245.56,-51.37,5.12,3.47,YES,NO,NO,false,
+2026-06-19,T624EMB,Port↔Vikindu,2026-06-19,37.49,38.69,-1.2,5.63,4.62,NO,NO,NO,false,
+2026-06-26,T893ERP,Ubungo→Port (Stock),2026-06-26,32.68,150.89,-118.21,3.94,0.97,NO,NO,NO,false,
+2026-06-26,T895ERP,Ubungo→Port (Stock),2026-06-26,106.39,256.9,-150.51,4.3,0.79,NO,NO,NO,false,
+2026-06-27,T889ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-06-27,T884ERP,Ubungo→Port (Stock),2026-06-27,253.78,249.36,4.42,0.32,1.1,NO,NO,NO,false,
+2026-06-29,T895ERP,Ubungo→Port (Stock),2026-06-29,212.87,207.63,5.24,0.11,0.29,NO,NO,NO,false,
+2026-06-29,T887ERP,Ubungo→Port (Stock),2026-06-29,149.48,294.48,-145,3.72,0.97,NO,NO,NO,false,
+2026-06-30,T884ERP,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-07-02,T895ERP,Ubungo→Port (Stock),2026-07-02,130.09,332.64,-202.55,0.23,0.44,NO,NO,NO,false,
+2026-05-23,T891ERP,Port↔Vikindu,2026-05-23,52.92,221.92,-169,3.86,2.19,NO,NO,NO,false,
+2026-05-24,T624EMB,Port↔Vikindu,2026-05-24,287.75,330.68,-42.93,5.27,4.67,YES,NO,NO,false,
+2026-05-24,T892ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-05-24,T621EMB,Port↔Vikindu,2026-05-24,236.31,266.2,-29.89,2.66,1.95,NO GPS,NO GPS,NO GPS,false,
+2026-05-24,T891ERP,Port↔Vikindu,2026-05-24,221.92,259.94,-38.02,5.68,2.76,YES,NO,NO,false,
+2026-05-24,T317ELP,Port↔Vikindu,2026-05-24,221.92,143.58,78.34,0.53,0.97,YES,NO,NO,false,
+2026-05-24,T884ERP,Port↔Vikindu,2026-05-24,218.83,132.89,85.94,5.7,6.01,YES,NO,NO,false,
+2026-05-28,T889ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-05-28,T317ELP,Ubungo→Port (Stock),2026-05-28,126.98,186.58,-59.6,2.37,0.53,NO,NO,NO,false,
+2026-05-28,T662EJM,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-29,T884ERP,Ubungo→Port (Stock),2026-05-29,167.46,157.48,9.98,0.15,2.46,NO,NO,NO,false,
+2026-05-29,T891ERP,Ubungo→Port (Stock),2026-05-29,126.08,222.12,-96.04,0.25,1.55,NO,NO,NO,false,
+2026-05-29,T662EJM,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-29,T661EJM,Ubungo→Port (Stock),2026-05-29,104.3,226.24,-121.94,5.33,1.26,YES,NO,NO,false,
+2026-05-29,T892ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-05-29,T885ERP,Ubungo→Port (Stock),2026-05-29,76.23,179.25,-103.02,2.02,3.08,NO,NO,NO,false,
+2026-05-29,T468EMV,Ubungo→Port (Stock),Thu May 28,33.07,33.22,-0.15,0.03,,,,,false,DATA FROM Thu May 28 (±1 day)
+2026-06-01,T621EMB,Ubungo→Port (Stock),2026-06-01,32.79,235.79,-203,0.2,0.58,NO,NO,NO,false,
+2026-06-01,T662EJM,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-01,T318ELP,Ubungo→Port (Stock),2026-06-01,143.89,131.59,12.3,0.27,1.27,NO,NO,NO,false,
+2026-06-01,T624EMB,Ubungo→Port (Stock),2026-06-01,287.7,203.73,83.97,3.61,1.42,YES,NO,NO,false,
+2026-06-02,T890ERP,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-03,T621EMB,Ubungo→Port (Stock),2026-06-03,146.89,242.16,-95.27,0.13,1.44,NO,NO,NO,false,
+2026-06-03,T769EMX,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-04,T317ELP,Ubungo→Port (Stock),2026-06-04,54.81,202.3,-147.49,3.94,2.15,NO,NO,NO,false,
+2026-06-04,T893ERP,Ubungo→Port (Stock),2026-06-04,132.38,74.94,57.44,4.31,0.95,NO,NO,NO,false,
+2026-05-28,T768EMX,Ubungo→Port (Stock),2026-05-28,49.25,207.84,-158.59,3.74,0.89,NO,NO,NO,false,
+2026-05-29,T895ERP,Ubungo→Port (Stock),2026-05-29,39.19,286.49,-247.3,4.11,1.05,NO,NO,NO,false,
+2026-06-01,T887ERP,Ubungo→Port (Stock),2026-06-01,193.87,386.66,-192.79,0.21,1.08,NO,NO,NO,false,
+2026-06-04,T887ERP,Ubungo→Port (Stock),2026-06-04,288.72,233.17,55.55,3.96,0.86,NO,NO,NO,false,
+2026-06-13,T891ERP,Ubungo→Port (Stock),2026-06-13,32.68,193.45,-160.77,4.55,1.74,NO,NO,NO,false,
+2026-06-14,T624EMB,Ubungo→Port (Stock),2026-06-14,,,,3.26,2.25,NO,NO,NO,true,STALE SENSOR
+2026-06-17,T887ERP,Ubungo→Port (Stock),2026-06-17,206.63,401.58,-194.95,0.26,2.32,NO,NO,NO,false,
+2026-06-18,T314ELP,Ubungo→Port (Stock),2026-06-18,92.4,250.11,-157.71,4.66,1.51,NO,NO,NO,false,
+2026-06-05,T621EMB,Ubungo→Port (Stock),2026-06-05,151.59,142.88,8.71,0.33,1.1,NO,NO,NO,false,
+2026-06-05,T769EMX,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-05,T624EMB,Port↔Vikindu,2026-06-05,265.08,257.16,7.92,2.53,3.27,YES,NO,NO,false,
+2026-06-05,T893ERP,Port↔Vikindu,2026-06-05,74.24,47.47,26.77,2.63,3.06,YES,NO,NO,false,
+2026-06-05,T282EHK,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-05,T468EMV,Ubungo→Port (Stock),2026-06-05,32.59,32.59,0,0,0,YES,NO,NO,false,
+2026-06-05,T316ELP,Ubungo→Port (Stock),2026-06-05,197.88,212.98,-15.1,4.32,2.16,NO,NO,NO,false,
+2026-06-05,T768EMX,Ubungo→Port (Stock),2026-06-05,181.99,135.19,46.8,3.74,0.9,NO,NO,NO,false,
+2026-06-05,T895ERP,Ubungo→Port (Stock),2026-06-05,350.22,309.39,40.83,4.04,0.56,NO,NO,NO,false,
+2026-06-01,T892ERP,Ubungo→Port (Stock),,,,,,,,,,,NOT IN GPS SYSTEM
+2026-06-02,T317ELP,Ubungo→Port (Stock),2026-06-02,141.09,90.4,50.69,4.37,1.72,NO,NO,NO,false,
+2026-06-01,T768EMX,Ubungo→Port (Stock),2026-06-01,191.23,264.97,-73.74,3.11,7.46,YES,NO,NO,false,
+2026-06-03,T662EJM,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-05,T892ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-06-10,T662EJM,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-10,T317ELP,Ubungo→Port (Stock),2026-06-10,98,85.5,12.5,0.33,0.67,NO,NO,NO,false,
+2026-06-10,T769EMX,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-28,T661EJM,Port↔Vikindu,2026-05-28,116.79,104.3,12.49,1.67,2.36,YES,NO,NO,false,
+2026-06-01,T769EMX,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-02,T893ERP,Ubungo→Port (Stock),2026-06-02,32.68,174.95,-142.27,4.33,1.65,NO,NO,NO,false,
+2026-06-03,T314ELP,Ubungo→Port (Stock),2026-06-03,118.09,161.86,-43.77,4.58,2.46,NO,NO,NO,false,
+2026-06-04,T624EMB,Ubungo→Port (Stock),2026-06-04,118.99,266.43,-147.44,4.79,2.79,NO,NO,NO,false,
+2026-06-05,T886ERP,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-12,T887ERP,Ubungo→Port (Stock),2026-06-12,200.03,374.29,-174.26,2.74,1.88,NO,NO,NO,false,
+2026-06-12,T662EJM,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-06-12,T774EMX,Ubungo→Port (Stock),2026-06-12,170.2,120.28,49.92,4.51,2.14,NO,NO,NO,false,
+2026-06-13,T895ERP,Ubungo→Port (Stock),2026-06-13,107.68,262.92,-155.24,4.25,0.84,NO,NO,NO,false,
+2026-06-14,T468EMV,Ubungo→Port (Stock),Mon Jun 15,32.59,32.59,0,0.02,,,,,false,DATA FROM Mon Jun 15 (±1 day)
+2026-06-14,T662EJM,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-24,T774EMX,Port↔Vikindu,2026-05-24,227.37,240.73,-13.36,4.72,1.42,YES,NO,NO,false,
+2026-05-23,T774EMX,Port↔Vikindu,2026-05-23,148.58,227.37,-78.79,10.74,0.88,NO,NO,NO,false,
+2026-05-28,T318ELP,Port↔Vikindu,2026-05-28,129.29,205.86,-76.57,3.92,1.11,NO,NO,NO,false,
+2026-05-24,T318ELP,Port↔Vikindu,2026-05-24,107.29,247.51,-140.22,6.52,2,NO,NO,NO,false,
+2026-05-24,T769EMX,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-24,T885ERP,Port↔Vikindu,2026-05-24,226.24,267.89,-41.65,3.77,1.46,YES,NO,NO,false,
+2026-05-24,T316ELP,Port↔Vikindu,2026-05-24,226.06,300.02,-73.96,5.39,3.75,YES,NO,NO,false,
+2026-05-24,T890ERP,Port↔Vikindu,2026-05-24,211.13,266.93,-55.8,4.77,4.13,NO,NO,NO,false,
+2026-05-23,T894ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-05-23,T892ERP,Port↔Vikindu,,,,,,,,,,,NOT IN GPS SYSTEM
+2026-05-23,T624EMB,Port↔Vikindu,2026-05-23,246.69,287.7,-41.01,10.74,1.26,NO,NO,NO,false,
+2026-05-23,T317ELP,Port↔Vikindu,2026-05-23,268.47,221.92,46.55,1.88,0.25,NO,NO,NO,false,
+2026-05-23,T316ELP,Port↔Vikindu,2026-05-23,273.1,226.17,46.93,3.91,1.12,NO,NO,NO,false,
+2026-05-23,T890ERP,Port↔Vikindu,2026-05-23,69.28,211.33,-142.05,4.61,1.38,NO,NO,NO,false,
+2026-05-22,T890ERP,Ubungo→Port (Stock),2026-05-22,75.64,69.58,6.06,0.39,1.44,NO,NO,NO,false,
+2026-05-22,T317ELP,Ubungo→Port (Stock),2026-05-22,170.5,271.86,-101.36,0.09,0.87,NO,NO,NO,false,
+2026-05-22,T887ERP,Ubungo→Port (Stock),2026-05-22,164.64,154.38,10.26,0.18,2.05,NO,NO,NO,false,
+2026-05-22,T893ERP,Ubungo→Port (Stock),2026-05-22,147.18,84.1,63.08,4.26,2.34,NO,NO,NO,false,
+2026-05-20,T893ERP,Ubungo→Port (Stock),2026-05-20,54.01,242.41,-188.4,0.51,3.11,NO,NO,NO,false,
+2026-05-23,T884ERP,Port↔Vikindu,2026-05-23,155.59,218.8,-63.21,4.23,3.59,NO,NO,NO,false,
+2026-05-23,T621EMB,Port↔Vikindu,2026-05-23,60.45,236.31,-175.86,2.51,0.35,NO,NO,NO,false,
+2026-05-23,T885ERP,Port↔Vikindu,2026-05-23,113.04,226.24,-113.2,0.37,0.27,NO,NO,NO,false,
+2026-05-22,T895ERP,Ubungo→Port (Stock),2026-05-22,154.08,150.49,3.59,0.2,0.99,NO,NO,NO,false,
+2026-05-23,T769EMX,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-22,T316ELP,Ubungo→Port (Stock),2026-05-22,105.09,273.71,-168.62,2.86,3,NO,NO,NO,false,
+2026-05-16,T884ERP,Port↔Vikindu,2026-05-16,46.57,134.69,-88.12,1.63,1.7,YES,NO,NO,false,
+2026-05-16,T885ERP,Port↔Vikindu,2026-05-16,56.29,129.09,-72.8,1.11,3.38,YES,NO,NO,false,
+2026-05-16,T318ELP,Port↔Vikindu,2026-05-16,103.4,44.09,59.31,7.11,1.32,NO,NO,NO,false,
+2026-05-20,T895ERP,Ubungo→Port (Stock),2026-05-20,59.89,252.74,-192.85,0.3,1.31,NO,NO,NO,false,
+2026-05-16,T624EMB,Port↔Vikindu,2026-05-16,,,,4.41,3.38,NO,NO,NO,true,STALE SENSOR
+2026-05-19,T318ELP,Ubungo→Port (Stock),2026-05-19,139.58,94.59,44.99,4.11,1.71,NO,NO,NO,false,
+2026-05-20,T887ERP,Ubungo→Port (Stock),2026-05-20,57.18,248.49,-191.31,0.47,2.06,NO,NO,NO,false,
+2026-05-16,T468EMV,Port↔Vikindu,Sun May 17,32.59,32.48,0.11,0.76,,,,,false,DATA FROM Sun May 17 (±1 day)
+2026-05-19,T661EJM,Ubungo→Port (Stock),2026-05-19,67.9,76.23,-8.33,3.57,2.2,NO,NO,NO,false,
+2026-05-16,T317ELP,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-19,T768EMX,Ubungo→Port (Stock),2026-05-19,65.03,208.26,-143.23,4.42,3.88,NO,NO,NO,false,
+2026-05-13,T282EHK,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-20,T317ELP,Ubungo→Port (Stock),2026-05-20,138.99,207.54,-68.55,0.67,0.34,NO GPS,NO GPS,NO GPS,false,
+2026-05-14,T317ELP,Ubungo→Port (Stock),2026-05-14,82.41,79.01,3.4,0.03,0.18,NO GPS,NO GPS,NO GPS,false,
+2026-05-13,T621EMB,Ubungo→Port (Stock),2026-05-13,156.52,196.18,-39.66,0.21,1.13,NO,NO,NO,false,
+2026-05-11,T282EHK,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-16,T662EJM,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-16,T662EJM,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-13,T662EJM,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-19,T774EMX,Ubungo→Port (Stock),Wed May 20,80.19,313.51,-233.32,7.57,,,,,false,DATA FROM Wed May 20 (±1 day)
+2026-05-16,T774EMX,Port↔Vikindu,Fri May 15,111.99,216.07,-104.08,7.52,,,,,false,DATA FROM Fri May 15 (±1 day)
+2026-05-11,T774EMX,Ubungo→Port (Stock),2026-05-11,9777,87.7,9689.3,3.54,1.88,YES,NO,NO,false,
+2026-05-16,T774EMX,Ubungo→Port (Stock),Fri May 15,111.99,216.07,-104.08,7.52,,,,,false,DATA FROM Fri May 15 (±1 day)
+2026-05-08,T774EMX,Port↔Vikindu,2026-05-08,3892,14155,-10263,4.2,0.8,NO,NO,NO,false,
+2026-05-08,T774EMX,Ubungo→Port (Stock),2026-05-08,3892,14155,-10263,4.2,0.8,NO,NO,NO,false,
+2026-05-08,T769EMX,Port↔Vikindu,2026-05-08,7195,16967,-9772,3.82,0.94,NO,NO,NO,false,
+2026-05-08,T769EMX,Ubungo→Port (Stock),2026-05-08,7195,16967,-9772,3.82,0.94,NO,NO,NO,false,
+2026-05-01,T769EMX,Port↔Vikindu,2026-05-01,11278,3919,7359,8.73,5.28,YES,NO,NO,false,
+2026-05-05,T768EMX,Port↔Vikindu,2026-05-05,13939,15990,-2051,6.61,6.9,NO,YES,NO,false,
+2026-05-01,T768EMX,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-13,T468EMV,Ubungo→Port (Stock),2026-05-13,32.98,32.59,0.39,0.15,1.13,NO,NO,NO,false,
+2026-05-05,T468EMV,Port↔Vikindu,2026-05-05,3650,3624,26,2.69,2.85,YES,NO,NO,false,
+2026-05-01,T468EMV,Port↔Vikindu,2026-05-01,3624,3630,-6,6.43,4.51,YES,NO,NO,false,
+2026-05-08,T624EMB,Port↔Vikindu,2026-05-08,20480,13703,6777,7.67,6.06,NO,NO,NO,false,
+2026-05-05,T624EMB,Port↔Vikindu,2026-05-05,19732,20729,-997,7.53,3.86,NO,YES,NO,false,
+2026-05-05,T314ELP,Port↔Vikindu,2026-05-05,17487,16234,1253,6.93,2.59,NO,YES,NO,false,
+2026-05-01,T314ELP,Port↔Vikindu,2026-05-01,18146,6868,11278,10.88,5.3,NO,NO,NO,false,
+2026-05-05,T621EMB,Port↔Vikindu,2026-05-05,14139,8396,5743,2.21,3.34,YES,NO,NO,false,
+2026-05-08,T318ELP,Port↔Vikindu,2026-05-08,19628,11770,7858,9.41,2.39,YES,NO,NO,false,
+2026-05-05,T318ELP,Port↔Vikindu,2026-05-05,15486,10367,5119,5.95,2.83,YES,NO,NO,false,
+2026-05-02,T318ELP,Ubungo→Port (Stock),2026-05-02,8034,16613,-8579,6.51,2.87,NO,NO,NO,false,
+2026-05-01,T317ELP,Port↔Vikindu,2026-05-01,17045,18545,-1500,8.78,2.53,NO,NO,NO,false,
+2026-05-05,T317ELP,Port↔Vikindu,2026-05-05,17255,11827,5428,1.33,1.67,NO GPS,NO GPS,NO GPS,false,
+2026-05-07,T317ELP,Ubungo→Port (Stock),2026-05-07,17550,17412,138,3.15,0.58,YES,NO,NO,false,
+2026-05-08,T317ELP,Port↔Vikindu,2026-05-08,17412,13494,3918,5.96,3.65,NO,NO,NO,false,
+2026-05-13,T316ELP,Ubungo→Port (Stock),2026-05-13,242.36,236.31,6.05,0.49,1.64,NO,NO,NO,false,
+2026-05-11,T316ELP,Ubungo→Port (Stock),2026-05-11,247.32,208.16,39.16,3.71,2.21,YES,NO,NO,false,
+2026-05-08,T316ELP,Port↔Vikindu,2026-05-08,88.9,237.96,-149.06,4.36,2.25,NO,NO,NO,false,
+2026-05-07,T316ELP,Ubungo→Port (Stock),2026-05-07,101.99,89.59,12.4,0.51,2.09,NO,NO,NO,false,
+2026-05-09,T661EJM,Ubungo→Port (Stock),2026-05-09,5695,15453,-9758,4.08,2.46,NO,NO,NO,false,
+2026-05-05,T662EJM,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-01,T662EJM,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-01,T661EJM,Port↔Vikindu,2026-05-01,13889,14037,-148,10.74,7.53,NO,NO,NO,false,
+2026-05-05,T661EJM,Port↔Vikindu,2026-05-05,15064,9876,5188,5.25,4.76,YES,NO,NO,false,
+2026-05-09,T282EHK,Ubungo→Port (Stock),,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-05,T282EHK,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
+2026-05-01,T282EHK,Port↔Vikindu,,,,,,,,,,,NO FUEL DATA (GPS offline or sensor dead)
