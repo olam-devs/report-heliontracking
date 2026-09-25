@@ -13,9 +13,9 @@ const path   = require('path');
 const DB = { host: '127.0.0.1', port: 3311, user: 'root', password: 'cmsserverv6', database: '1010GPS' };
 
 // Ubungo waypoint for GPS blob check (same as generate script)
-const WP_UBUNGO  = { lat: -6.7821, lng: 39.2083, radiusKm: 3.0 };
-const WP_PORT    = { lat: -6.8200, lng: 39.2950, radiusKm: 3.0 };
-const WP_VIKINDU = { lat: -6.8760, lng: 39.5260, radiusKm: 3.0 };
+const WP_UBUNGO  = { lat: -6.7925, lng: 39.2094, radiusKm: 1.2 };
+const WP_PORT    = { lat: -6.8422, lng: 39.2958, radiusKm: 3.0 };
+const WP_VIKINDU = { lat: -7.0144, lng: 39.3073, radiusKm: 1.5 };
 
 function haversineKm(la1, lo1, la2, lo2) {
   const R = 6371, dLat = (la2-la1)*Math.PI/180, dLon = (lo2-lo1)*Math.PI/180;
@@ -151,7 +151,7 @@ function parseGPSBlob(buf) {
         gpsDate:       String(best.GPSDate).slice(0,10),
         startFuel_L:   sensorStale ? null : +startL.toFixed(2),
         endFuel_L:     sensorStale ? null : +endL.toFixed(2),
-        usedFuel_L:    sensorStale ? null : +(startL - endL).toFixed(2),
+        netChange_L:   sensorStale ? null : +(endL - startL).toFixed(2),
         driveHrs:      +Number(best.driveHrs).toFixed(2),
         sensorStale,
         note: `DATA FROM ${String(best.GPSDate).slice(0,10)} (±1 day)${sensorStale?' STALE SENSOR':''}`,
@@ -177,7 +177,7 @@ function parseGPSBlob(buf) {
       gpsDate:       trip.Date,
       startFuel_L:   sensorStale ? null : +startL.toFixed(2),
       endFuel_L:     sensorStale ? null : +endL.toFixed(2),
-      usedFuel_L:    sensorStale ? null : +(startL - endL).toFixed(2),
+      netChange_L:   sensorStale ? null : +(endL - startL).toFixed(2),
       driveHrs:      +Number(day.driveHrs).toFixed(2),
       idleHrs:       +Number(day.idleHrs).toFixed(2),
       sensorStale,
@@ -197,7 +197,7 @@ function parseGPSBlob(buf) {
   // Write CSV
   const csvPath = path.join(__dirname, '..', 'dispatch_fuel_results.csv');
   const cols = ['Date','VehicleClean','TripType','gpsDate','startFuel_L','endFuel_L',
-                'usedFuel_L','driveHrs','idleHrs','passedUbungo','passedPort','passedVikindu','sensorStale','note'];
+                'netChange_L','driveHrs','idleHrs','passedUbungo','passedPort','passedVikindu','sensorStale','note'];
   const rows = [cols.join(',')];
   for (const r of results) {
     rows.push(cols.map(c => {
