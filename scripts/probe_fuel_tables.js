@@ -10,7 +10,7 @@ const DB = { host:'127.0.0.1', port:3311, user:'root', password:'cmsserverv6', d
 
   // Get SEMI vehicle IDs
   const [vehicles] = await conn.query(`
-    SELECT vi.ID, vi.VehiIDNO, vi.DevIDNO
+    SELECT vi.ID, vi.VehiIDNO
     FROM jt808_vehicle_info vi
     JOIN jt808_company_info co ON co.ID = vi.CompanyID
     WHERE co.ID = 3 ORDER BY vi.VehiIDNO
