@@ -73,7 +73,7 @@ async function runNotificationScan({ begintime, endtime, plate } = {}) {
     const results = await mapWithConcurrency(list, async (v) => {
       let tracks = [];
       try {
-        tracks = await cms.getGPSHistory(v.devIdno, bt, et);
+        tracks = await cms.getGPSHistory(v.devIdno, bt, et, { cache: false });
       } catch (_) {
         return { alerts: [] };
       }

@@ -259,13 +259,15 @@ async function getRawStatus() {
   return (data.status || []).map(s => ({ ...s }));
 }
 
-async function getGPSHistory(devIdno, begintime, endtime) {
+async function getGPSHistory(devIdno, begintime, endtime, { cache = true } = {}) {
   const key = `hist_${devIdno}_${begintime}_${endtime}`;
   const hit = dataCache.get(key);
   if (hit) return hit;
   const data = await req('/StandardApiAction_queryTrackDetail.action', { devIdno, begintime, endtime });
   const tracks = (data.tracks || []).map(scaleStatus);
-  cacheSet(key, tracks, TTL.report);
+  // One-off windows (e.g. the notification scanner's rolling "now") are never
+  // requested again; caching them kept whole-fleet 48h histories in memory.
+  if (cache) cacheSet(key, tracks, TTL.report);
   return tracks;
 }
 
