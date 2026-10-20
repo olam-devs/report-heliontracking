@@ -816,6 +816,17 @@ async function mapWithConcurrency(items, fn, concurrency = 8) {
 const reportBuildCache = new Map();
 const inflightReports = new Map();
 const REPORT_CACHE_MS = parseInt(process.env.DAILY_REPORT_CACHE_MS, 10) || 180000;
+// Every distinct period/threshold used to stay in memory forever (grew to ~7 GB).
+// Keep only the most recently built reports; live refresh reads the latest ones.
+const REPORT_CACHE_MAX = parseInt(process.env.DAILY_REPORT_CACHE_MAX, 10) || 8;
+
+function rememberReport(cacheKey, report) {
+  reportBuildCache.delete(cacheKey);
+  reportBuildCache.set(cacheKey, { at: Date.now(), report });
+  while (reportBuildCache.size > REPORT_CACHE_MAX) {
+    reportBuildCache.delete(reportBuildCache.keys().next().value);
+  }
+}
 
 function reportCacheKey(from, to, dropThresholdL, vehicleCount) {
   return `${from}|${to}|${dropThresholdL}|${vehicleCount}`;
@@ -915,7 +926,7 @@ async function buildDailyFleetReportWork(vehicles, period, dropThresholdL, cache
     settings: getSettings(),
     cached: false,
   };
-  reportBuildCache.set(cacheKey, { at: Date.now(), report: result });
+  rememberReport(cacheKey, result);
   return result;
 }
 
